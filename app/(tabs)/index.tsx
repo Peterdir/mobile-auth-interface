@@ -1,35 +1,33 @@
-import { Banner, Category, homeApi, Product } from '@/src/api/homeApi';
+import { DMChannel, homeApi, Server, User } from '@/src/api/homeApi';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, IconButton, Searchbar, Surface, Text } from 'react-native-paper';
+import { FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
-const { width } = Dimensions.get('window');
-
 export default function HomeScreen() {
     const user = useSelector((state: any) => state.auth.user);
-    const [banners, setBanners] = useState<Banner[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
+    const [dms, setDms] = useState<DMChannel[]>([]);
+    const [activeFriends, setActiveFriends] = useState<User[]>([]);
+    const [servers, setServers] = useState<Server[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedServerId, setSelectedServerId] = useState<string>('dm');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Parallel data fetching
-                const [bannersData, categoriesData, productsData] = await Promise.all([
-                    homeApi.getBanners(),
-                    homeApi.getCategories(),
-                    homeApi.getFeaturedProducts()
+                const [dmsData, friendsData, serversData] = await Promise.all([
+                    homeApi.getDMs(),
+                    homeApi.getFriends(),
+                    homeApi.getServers()
                 ]);
-                setBanners(bannersData);
-                setCategories(categoriesData);
-                setProducts(productsData);
+                setDms(dmsData);
+                // Filter friends who are online/idle/dnd for the top list
+                setActiveFriends(friendsData.filter(f => f.status.type !== 'offline'));
+                setServers(serversData);
             } catch (error) {
-                console.error("Error fetching home data:", error);
+                console.error("Error fetching data:", error);
             } finally {
                 setLoading(false);
             }
@@ -37,115 +35,164 @@ export default function HomeScreen() {
         fetchData();
     }, []);
 
-    if (loading) {
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'online': return 'bg-discord-online';
+            case 'idle': return 'bg-discord-idle';
+            case 'dnd': return 'bg-discord-dnd';
+            default: return 'bg-discord-offline';
+        }
+    };
+
+    const renderServerItem = (server: Server) => {
+        const isSelected = selectedServerId === server.id;
+        const isDM = server.id === 'dm';
+
         return (
-            <View className="flex-1 justify-center items-center bg-gray-50">
-                <ActivityIndicator size="large" color="#6200ee" />
+            <View key={server.id} className="flex-row items-center mb-2 w-full justify-center relative">
+                {/* Selection Indicator */}
+                {isSelected && (
+                    <View className="absolute left-0 w-1 h-10 bg-white rounded-r-lg" />
+                )}
+                {!isSelected && server.hasUnread && (
+                    <View className="absolute left-0 w-1 h-2 bg-white rounded-r-lg" />
+                )}
+
+                <TouchableOpacity
+                    className={`w-12 h-12 rounded-[24px] items-center justify-center overflow-hidden transition-all ${isSelected ? 'rounded-[16px] bg-discord-brand' : 'bg-discord-element group-active:rounded-[16px] group-active:bg-discord-brand'}`}
+                    onPress={() => setSelectedServerId(server.id)}
+                    activeOpacity={0.8}
+                >
+                    {isDM ? (
+                        <IconButton icon="message-text" size={24} iconColor={isSelected ? 'white' : '#DBDEE1'} style={{ margin: 0 }} />
+                    ) : server.iconUrl && !server.iconUrl.startsWith('http') ? (
+                        <Text className={`font-bold ${isSelected ? 'text-white' : 'text-gray-200'}`}>{server.name}</Text>
+                    ) : server.iconUrl ? (
+                        <Image source={{ uri: server.iconUrl }} className="w-full h-full" />
+                    ) : (
+                        <Text className={`font-bold ${isSelected ? 'text-white' : 'text-gray-200'}`}>{server.name.substring(0, 2).toUpperCase()}</Text>
+                    )}
+                </TouchableOpacity>
+
+                {/* Mentions Badge */}
+                {server.mentions > 0 && (
+                    <View className="absolute bottom-0 right-1 border-[3px] border-discord-element rounded-full bg-discord-dnd min-w-[20px] h-5 items-center justify-center px-1">
+                        <Text className="text-white text-[10px] font-bold">{server.mentions}</Text>
+                    </View>
+                )}
             </View>
         );
     }
 
-    const renderBanner = ({ item }: { item: Banner }) => (
-        <View className="mr-4 rounded-2xl overflow-hidden shadow-sm bg-white" style={{ width: width * 0.85, height: 180 }}>
-            <Image source={{ uri: item.imageUrl }} className="w-full h-full" resizeMode="cover" />
-            <View className="absolute bottom-0 left-0 right-0 bg-black/40 p-3">
-                <Text className="text-white font-bold text-lg">{item.title}</Text>
+    const renderDMItem = ({ item }: { item: DMChannel }) => {
+        const isGroup = item.type === 'group';
+        const name = isGroup ? item.name : item.participants[0].username;
+        const participant = item.participants[0];
+        const avatar = isGroup ? 'https://cdn.discordapp.com/embed/avatars/5.png' : participant.avatarUrl;
+        const status = isGroup ? null : participant.status.type;
+
+        return (
+            <TouchableOpacity className="flex-row items-center p-3 active:bg-discord-hover/40">
+                <View className="relative mr-3">
+                    <Image source={{ uri: avatar }} className="w-10 h-10 rounded-full bg-discord-element" />
+                    {status && (
+                        <View className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-[3px] border-discord-background ${getStatusColor(status)}`} />
+                    )}
+                </View>
+                <View className="flex-1 mt-1">
+                    <View className="flex-row justify-between items-center">
+                        <Text className={`text-base flex-1 ${item.unreadCount > 0 ? 'text-white font-bold' : 'text-discord-text-muted font-medium'}`} numberOfLines={1}>
+                            {name}
+                        </Text>
+                        <Text className="text-discord-text-muted text-xs">
+                            {item.lastMessage ? new Date(item.lastMessage.timestamp).getDate() + ' thg ' + (new Date(item.lastMessage.timestamp).getMonth() + 1) : ''}
+                        </Text>
+                    </View>
+                    <Text className={`text-sm mt-0.5 ${item.unreadCount > 0 ? 'text-discord-text-normal' : 'text-discord-text-muted'}`} numberOfLines={1}>
+                        {item.lastMessage?.content || ''}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    if (loading) {
+        return (
+            <View className="flex-1 justify-center items-center bg-discord-background">
+                <ActivityIndicator size="large" color="#5865F2" />
             </View>
-        </View>
-    );
+        );
+    }
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
-            <StatusBar style="dark" />
-            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-                {/* Header Section */}
-                <View className="px-5 pt-2 pb-6 bg-white rounded-b-[30px] shadow-sm mb-4">
-                    <View className="flex-row justify-between items-center mb-6">
-                        <View>
-                            <Text variant="bodyLarge" className="text-gray-500">Good Morning,</Text>
-                            <Text variant="headlineMedium" className="font-bold text-gray-800">{user?.user || 'Guest'}!</Text>
+        <SafeAreaView className="flex-1 bg-discord-background flex-row" edges={['top']}>
+            <StatusBar style="light" backgroundColor="#1E1F22" />
+
+            {/* Sidebar (Servers) */}
+            <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full hidden sm:flex">
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }}>
+                    {servers.map(renderServerItem)}
+
+                    {/* Add Server Button */}
+                    <TouchableOpacity className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2">
+                        <IconButton icon="plus" size={24} iconColor="#23A559" style={{ margin: 0 }} />
+                    </TouchableOpacity>
+                </ScrollView>
+            </View>
+
+            {/* Main Content (DMs) */}
+            <View className="flex-1 bg-discord-background rounded-tl-[16px] overflow-hidden">
+                {/* Header */}
+                <View className="px-4 pt-4 pb-2 bg-discord-background shadow-sm">
+                    <Text className="text-white font-bold text-2xl mb-1">Các tin nhắn</Text>
+                    <Text className="text-discord-text-muted text-xs mb-3 font-semibold">
+                        Xin chào, {user?.user || 'Bạn'}!
+                    </Text>
+
+                    {/* Search & Add Friend */}
+                    <View className="h-9 mb-4 flex-row items-center bg-discord-element rounded-md px-2">
+                        <IconButton icon="magnify" size={20} iconColor="#949BA4" style={{ margin: 0, marginRight: 4 }} />
+                        <Text className="text-discord-text-muted flex-1 text-sm">Tìm cuộc trò chuyện hoặc bắt đầu...</Text>
+                    </View>
+
+                    {/* Horizontal Active Friends */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2" contentContainerStyle={{ paddingRight: 10 }}>
+                        <View className="items-center mr-4 w-16">
+                            <View className="w-14 h-14 rounded-full bg-discord-element items-center justify-center border-2 border-dashed border-gray-600 mb-1">
+                                <IconButton icon="plus" size={24} iconColor="#949BA4" style={{ margin: 0 }} />
+                            </View>
+                            <Text className="text-discord-text-muted text-xs text-center" numberOfLines={1}>Thêm Bạn Bè</Text>
                         </View>
-                        <Surface className="rounded-full bg-gray-50" elevation={0}>
-                            <IconButton icon="bell-outline" size={26} onPress={() => { }} />
-                        </Surface>
-                    </View>
-                    <Searchbar
-                        placeholder="Search products..."
-                        onChangeText={setSearchQuery}
-                        value={searchQuery}
-                        className="bg-gray-100 rounded-xl elevation-0"
-                        inputStyle={{ minHeight: 0 }}
-                        style={{ height: 50 }}
-                    />
-                </View>
-
-                {/* Banners */}
-                <View className="py-2 mb-4">
-                    <FlatList
-                        horizontal
-                        data={banners}
-                        renderItem={renderBanner}
-                        keyExtractor={item => item.id}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: 20 }}
-                    />
-                </View>
-
-                {/* Categories */}
-                <View className="px-5 mb-6">
-                    <View className="flex-row justify-between items-center mb-4">
-                        <Text variant="titleLarge" className="font-bold text-gray-800">Categories</Text>
-                        <TouchableOpacity onPress={() => console.log('See all categories')}>
-                            <Text variant="bodyMedium" className="text-purple-600 font-bold">See All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View className="flex-row flex-wrap justify-between">
-                        {categories.map((item) => (
-                            <TouchableOpacity key={item.id} className="w-[22%] items-center mb-4" onPress={() => console.log(`Pressed ${item.name}`)}>
-                                <View className="w-16 h-16 rounded-2xl items-center justify-center bg-purple-50 mb-2">
-                                    <IconButton icon={item.icon} size={28} iconColor="#6200ee" style={{ margin: 0 }} />
+                        {activeFriends.map(friend => (
+                            <View key={friend.id} className="items-center mr-4 w-16 relative">
+                                <View className="relative mb-1">
+                                    <Image source={{ uri: friend.avatarUrl }} className="w-14 h-14 rounded-full bg-discord-element" />
+                                    <View className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-discord-background ${getStatusColor(friend.status.type)}`} />
                                 </View>
-                                <Text variant="labelMedium" className="text-gray-600 font-medium text-center" numberOfLines={1}>{item.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Featured Products */}
-                <View className="px-3 mb-20">
-                    <View className="flex-row justify-between items-center px-2 mb-4">
-                        <Text variant="titleLarge" className="font-bold text-gray-800">Featured</Text>
-                        <TouchableOpacity onPress={() => console.log('See all products')}>
-                            <Text variant="bodyMedium" className="text-purple-600 font-bold">See All</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View className="flex-row flex-wrap">
-                        {products.map((item) => (
-                            <View key={item.id} className="w-[50%] p-2">
-                                <Surface className="bg-white rounded-2xl overflow-hidden shadow-sm h-full" elevation={1}>
-                                    <View className="relative">
-                                        <Image source={{ uri: item.imageUrl }} className="w-full h-40 bg-gray-200" resizeMode="cover" />
-                                        <TouchableOpacity className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow-sm">
-                                            <IconButton icon="heart-outline" size={16} iconColor="red" style={{ margin: 0 }} />
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View className="p-3">
-                                        <Text variant="titleMedium" numberOfLines={1} className="font-semibold text-gray-800 mb-1">{item.name}</Text>
-                                        <View className="flex-row justify-between items-center mt-2">
-                                            <Text variant="headlineSmall" className="text-purple-600 font-bold text-[18px]">${item.price}</Text>
-                                            <TouchableOpacity className="bg-purple-600 rounded-lg p-2" onPress={() => console.log(`Add ${item.name}`)}>
-                                                <IconButton icon="plus" size={16} iconColor="white" style={{ margin: 0 }} />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </Surface>
+                                <Text className="text-discord-text-header text-xs text-center font-bold" numberOfLines={1}>{friend.username}</Text>
+                                {friend.status.text && (
+                                    <Text className="text-discord-text-muted text-[10px] text-center" numberOfLines={1}>{friend.status.text}</Text>
+                                )}
                             </View>
                         ))}
-                    </View>
+                    </ScrollView>
                 </View>
-            </ScrollView>
+
+                {/* DM List */}
+                <View className="flex-1 bg-discord-background rounded-t-[20px] mt-2 overflow-hidden">
+                    <FlatList
+                        data={dms}
+                        renderItem={renderDMItem}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={{ paddingBottom: 80 }}
+                    />
+                </View>
+
+                {/* FAB */}
+                <TouchableOpacity className="absolute bottom-6 right-4 w-14 h-14 rounded-full bg-discord-brand items-center justify-center shadow-lg">
+                    <IconButton icon="message-text" size={28} iconColor="white" style={{ margin: 0 }} />
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 }

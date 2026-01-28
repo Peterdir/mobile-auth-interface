@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { MD3LightTheme, PaperProvider } from 'react-native-paper';
+import { MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import { Provider, useDispatch } from 'react-redux';
 import '../src/global.css';
 import { login } from '../src/store/slices/authSlice';
@@ -9,11 +9,13 @@ import { storage } from '../src/utils/storage';
 
 // Define a custom theme if needed, or use default
 const theme = {
-  ...MD3LightTheme,
+  ...MD3DarkTheme,
   colors: {
-    ...MD3LightTheme.colors,
-    primary: '#6200ee',
-    secondary: '#03dac6',
+    ...MD3DarkTheme.colors,
+    primary: '#5865F2',
+    secondary: '#23A559',
+    background: '#313338',
+    surface: '#2B2D31',
   },
 };
 
