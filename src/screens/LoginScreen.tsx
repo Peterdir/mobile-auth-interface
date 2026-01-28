@@ -1,12 +1,17 @@
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useDispatch } from 'react-redux';
 import { loginUser } from "../api/authApi";
 import { COLORS } from '../constants/colors';
+import { login } from '../store/slices/authSlice';
+import { storage } from '../utils/storage';
 
 export default function LoginScreen() {
 
 
+    const dispatch = useDispatch();
+    const router = useRouter();
     const [userName, setUserName] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -23,7 +28,13 @@ export default function LoginScreen() {
             if (result.token) {
                 // Login thành công
                 Alert.alert('Thành công', result.message);
-                // TODO: Lưu token và chuyển sang màn hình chính
+                const userInfo = { user: userName, token: result.token };
+                await Promise.all([
+                    storage.saveToken(result.token),
+                    storage.saveUserInfo(userInfo)
+                ]);
+                dispatch(login(userInfo));
+                router.replace('/(tabs)');
             } else {
                 // Login thất bại
                 Alert.alert('Lỗi', result.message);
