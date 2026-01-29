@@ -10,8 +10,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
 export default function HomeScreen() {
+    // Lấy thông tin người dùng
     const user = useSelector((state: any) => state.auth.user);
+    // Lấy hàm dispatch để gửi action (vd: login, logout) và cập nhật state toàn app
     const dispatch = useDispatch();
+    // Lấy router từ expo-router để điều hướng giữa các màn hình
     const router = useRouter();
     const [dms, setDms] = useState<DMChannel[]>([]);
     const [activeFriends, setActiveFriends] = useState<User[]>([]);
