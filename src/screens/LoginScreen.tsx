@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { loginUser } from "../api/authApi";
 import { COLORS } from '../constants/colors';
@@ -48,7 +48,13 @@ export default function LoginScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Login</Text>
+            <View style={styles.logoContainer}>
+                <Image
+                    source={require('../../assets/images/splash-icon.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                />
+            </View>
 
 
             <TextInput
@@ -91,6 +97,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 24,
         backgroundColor: COLORS.background,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    logo: {
+        width: 120,
+        height: 120,
     },
     title: {
         fontSize: 28,

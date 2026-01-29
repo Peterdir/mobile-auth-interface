@@ -1,13 +1,18 @@
 import { DMChannel, homeApi, Server, User } from '@/src/api/homeApi';
+import { logout } from '@/src/store/slices/authSlice';
+import { storage } from '@/src/utils/storage';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, ScrollView, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 export default function HomeScreen() {
     const user = useSelector((state: any) => state.auth.user);
+    const dispatch = useDispatch();
+    const router = useRouter();
     const [dms, setDms] = useState<DMChannel[]>([]);
     const [activeFriends, setActiveFriends] = useState<User[]>([]);
     const [servers, setServers] = useState<Server[]>([]);
@@ -42,6 +47,24 @@ export default function HomeScreen() {
             case 'dnd': return 'bg-discord-dnd';
             default: return 'bg-discord-offline';
         }
+    };
+
+    const handleLogout = async () => {
+        Alert.alert(
+            "Đăng xuất",
+            "Bạn có chắc chắn muốn đăng xuất?",
+            [
+                { text: "Hủy", style: "cancel" },
+                {
+                    text: "Đăng xuất", style: 'destructive', onPress: async () => {
+                        await storage.removeToken();
+                        await storage.removeUserInfo();
+                        dispatch(logout());
+                        router.replace('/(auth)/login');
+                    }
+                }
+            ]
+        );
     };
 
     const renderServerItem = (server: Server) => {
@@ -129,13 +152,21 @@ export default function HomeScreen() {
             <StatusBar style="light" backgroundColor="#1E1F22" />
 
             {/* Sidebar (Servers) */}
-            <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full hidden sm:flex">
+            <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full flex">
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }}>
                     {servers.map(renderServerItem)}
 
                     {/* Add Server Button */}
                     <TouchableOpacity className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2">
                         <IconButton icon="plus" size={24} iconColor="#23A559" style={{ margin: 0 }} />
+                    </TouchableOpacity>
+
+                    {/* Logout Button */}
+                    <TouchableOpacity
+                        className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2 group-active:rounded-[16px] group-active:bg-red-500"
+                        onPress={handleLogout}
+                    >
+                        <IconButton icon="logout" size={24} iconColor="#F23F42" style={{ margin: 0 }} />
                     </TouchableOpacity>
                 </ScrollView>
             </View>
