@@ -205,17 +205,29 @@ export default function ProfileScreen() {
                         value={profile?.displayName || 'Chưa đặt'}
                         onPress={() => { setNewName(profile?.displayName || ''); setVisibleNameModal(true); }}
                     />
+                    <ProfileItem
+                        label="Bio"
+                        value={profile?.bio || 'Chưa có giới thiệu'}
+                        onPress={() => { /* TODO: Add Bio Modal or merge into Name Modal */ }}
+                    // For now just read-only or placeholder
+                    />
 
                     <ProfileItem
                         label="Email"
                         value={profile?.email || 'Chưa liên kết'}
-                        onPress={() => { setNewEmail(''); setVisibleEmailModal(true); }}
+                        onPress={() => {
+                            // setNewEmail(''); setVisibleEmailModal(true); 
+                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
+                        }}
                         secure={false}
                     />
                     <ProfileItem
                         label="Số điện thoại"
                         value={profile?.phoneNumber || 'Chưa liên kết'}
-                        onPress={() => { setNewPhone(''); setVisiblePhoneModal(true); }}
+                        onPress={() => {
+                            // setNewPhone(''); setVisiblePhoneModal(true); 
+                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
+                        }}
                     />
                 </View>
 
@@ -227,7 +239,10 @@ export default function ProfileScreen() {
                     <ProfileItem
                         label="Mật khẩu"
                         value="********"
-                        onPress={() => { setOldPass(''); setNewPass(''); setConfirmPass(''); setVisiblePassModal(true); }}
+                        onPress={() => {
+                            // setOldPass(''); setNewPass(''); setConfirmPass(''); setVisiblePassModal(true); 
+                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
+                        }}
                     />
                 </View>
 
