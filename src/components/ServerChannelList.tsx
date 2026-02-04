@@ -1,4 +1,5 @@
 import { InputModal } from '@/src/components/InputModal';
+import { InviteModal } from '@/src/components/InviteModal';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, SectionList, Text, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, IconButton, Portal } from 'react-native-paper';
@@ -8,6 +9,7 @@ import { COLORS } from '../constants/colors';
 interface ServerChannelListProps {
     serverId: string | number;
     serverName: string;
+    onChannelSelect?: (channelId: number, channelName: string) => void;
 }
 
 interface SectionData {
@@ -64,7 +66,7 @@ const MenuOption = ({ icon, label, onPress }: any) => (
     </TouchableOpacity>
 );
 
-export const ServerChannelList = ({ serverId, serverName }: ServerChannelListProps) => {
+export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: ServerChannelListProps) => {
     const [loading, setLoading] = useState(true);
     const [sections, setSections] = useState<SectionData[]>([]);
     const [serverDetails, setServerDetails] = useState<ServerResponse | null>(null);
@@ -73,6 +75,7 @@ export const ServerChannelList = ({ serverId, serverName }: ServerChannelListPro
     const [channelModalVisible, setChannelModalVisible] = useState(false);
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
+    const [inviteModalVisible, setInviteModalVisible] = useState(false);
 
     // Context for creation
     const [currentCategoryId, setCurrentCategoryId] = useState<number | undefined>(undefined);
@@ -143,10 +146,7 @@ export const ServerChannelList = ({ serverId, serverName }: ServerChannelListPro
                     openCreateChannelModal();
                     break;
                 case 'invite':
-                    // Just show a simple custom modal or alert for invite
-                    InputModal
-                    // Or keep using Alert for read-only info
-                    Alert.alert("Mã Lời Mời", serverDetails?.inviteCode || "Đang tải...");
+                    setInviteModalVisible(true);
                     break;
             }
         }, 300);
@@ -155,7 +155,7 @@ export const ServerChannelList = ({ serverId, serverName }: ServerChannelListPro
     const renderChannel = ({ item }: { item: ChannelResponse }) => (
         <TouchableOpacity
             className="flex-row items-center px-2 py-1.5 mx-2 rounded-md active:bg-discord-hover/20 mb-0.5 group"
-            onPress={() => console.log("Join channel", item.id)}
+            onPress={() => onChannelSelect?.(item.id, item.name)}
         >
             <IconButton
                 icon={item.type === 'VOICE' ? 'volume-high' : 'pound'}
@@ -241,6 +241,13 @@ export const ServerChannelList = ({ serverId, serverName }: ServerChannelListPro
                 placeholder="TÊN DANH MỤC"
                 onConfirm={handleCreateCategory}
                 confirmText="Tạo Danh Mục"
+            />
+
+            <InviteModal
+                visible={inviteModalVisible}
+                onDismiss={() => setInviteModalVisible(false)}
+                serverName={serverDetails?.name || serverName}
+                inviteCode={serverDetails?.inviteCode || ''}
             />
         </View>
     );

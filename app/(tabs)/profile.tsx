@@ -1,35 +1,39 @@
 import { profileApi, UserProfile } from '@/src/api/profileApi';
-import { IconSymbol } from '@/src/components/ui/icon-symbol';
 import { storage } from '@/src/utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ActivityIndicator, Avatar, Button, Divider, Modal, Provider as PaperProvider, Portal, TextInput } from 'react-native-paper';
+import { Alert, Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, IconButton, Modal, Provider as PaperProvider, Portal } from 'react-native-paper';
+
+// Discord Colors
+const DISCORD = {
+    blurple: '#5865F2',
+    green: '#57F287',
+    yellow: '#FEE75C',
+    red: '#ED4245',
+    white: '#FFFFFF',
+    black: '#23272A',
+    darkBg: '#313338',
+    darkerBg: '#1E1F22',
+    cardBg: '#2B2D31',
+    inputBg: '#1E1F22',
+    text: '#F2F3F5',
+    textMuted: '#B5BAC1',
+    textDark: '#949BA4',
+    divider: '#3F4147',
+    banner: '#5865F2',
+};
 
 export default function ProfileScreen() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // --- State cho các Modal ---
+    // Modal States
     const [visibleNameModal, setVisibleNameModal] = useState(false);
-    const [visiblePassModal, setVisiblePassModal] = useState(false);
-    const [visiblePhoneModal, setVisiblePhoneModal] = useState(false);
-    const [visibleEmailModal, setVisibleEmailModal] = useState(false);
-    const [visibleOtpModal, setVisibleOtpModal] = useState(false);
-
-    // --- State dữ liệu form ---
+    const [visibleBioModal, setVisibleBioModal] = useState(false);
     const [newName, setNewName] = useState('');
-
-    const [oldPass, setOldPass] = useState('');
-    const [newPass, setNewPass] = useState('');
-    const [confirmPass, setConfirmPass] = useState('');
-
-    const [newPhone, setNewPhone] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [otp, setOtp] = useState('');
-    const [otpContext, setOtpContext] = useState<'PHONE' | 'EMAIL' | null>(null);
-
+    const [newBio, setNewBio] = useState('');
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -41,8 +45,8 @@ export default function ProfileScreen() {
             setLoading(true);
             const data = await profileApi.getProfile();
             setProfile(data);
-            // Pre-fill
             setNewName(data.displayName || '');
+            setNewBio(data.bio || '');
         } catch (error) {
             console.error(error);
             Alert.alert('Lỗi', 'Không tải được thông tin cá nhân');
@@ -65,7 +69,6 @@ export default function ProfileScreen() {
         ]);
     };
 
-    // --- Xử lý Avatar ---
     const pickImage = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -92,7 +95,6 @@ export default function ProfileScreen() {
         }
     };
 
-    // --- Xử lý Đổi tên ---
     const updateName = async () => {
         if (!newName.trim()) {
             Alert.alert('Lỗi', 'Tên không được để trống');
@@ -108,295 +110,412 @@ export default function ProfileScreen() {
         }
     };
 
-    // --- Xử lý Đổi mật khẩu ---
-    const updatePassword = async () => {
-        if (newPass !== confirmPass) {
-            Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
-            return;
-        }
-        if (newPass.length < 6) {
-            Alert.alert('Lỗi', 'Mật khẩu mới quá ngắn');
-            return;
-        }
-        try {
-            await profileApi.changePassword({ oldPassword: oldPass, newPassword: newPass });
-            Alert.alert('Thành công', 'Đã thay đổi mật khẩu');
-            setVisiblePassModal(false);
-            setOldPass(''); setNewPass(''); setConfirmPass('');
-        } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Đổi mật khẩu thất bại');
-        }
-    };
-
-    // --- Xử lý OTP ---
-    const initiateChangePhone = async () => {
-        try {
-            await profileApi.initChangePhone(newPhone);
-            setVisiblePhoneModal(false);
-            setOtpContext('PHONE');
-            setOtp('');
-            setVisibleOtpModal(true);
-        } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể gửi OTP');
-        }
-    };
-
-    const initiateChangeEmail = async () => {
-        try {
-            await profileApi.initChangeEmail(newEmail);
-            setVisibleEmailModal(false);
-            setOtpContext('EMAIL');
-            setOtp('');
-            setVisibleOtpModal(true);
-        } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Không thể gửi OTP');
-        }
-    };
-
-    const verifyOtp = async () => {
-        try {
-            if (otpContext === 'PHONE') {
-                await profileApi.verifyChangePhone(otp);
-                Alert.alert('Thành công', 'Số điện thoại đã được cập nhật');
-            } else {
-                await profileApi.verifyChangeEmail(otp);
-                Alert.alert('Thành công', 'Email đã được cập nhật');
-            }
-            setVisibleOtpModal(false);
-            fetchProfile();
-        } catch (error: any) {
-            Alert.alert('Lỗi', error.message || 'Xác thực OTP thất bại');
-        }
-    };
-
     if (loading) {
-        return <View style={styles.center}><ActivityIndicator size="large" color="#5865F2" /></View>;
+        return (
+            <View style={styles.loadingContainer}>
+                <StatusBar barStyle="light-content" backgroundColor={DISCORD.darkerBg} />
+                <ActivityIndicator size="large" color={DISCORD.blurple} />
+            </View>
+        );
     }
 
     return (
         <PaperProvider>
-            <ScrollView style={styles.container}>
-                {/* Header Profile */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={pickImage} disabled={uploading}>
-                        <View style={styles.avatarContainer}>
+            <StatusBar barStyle="light-content" backgroundColor={DISCORD.banner} />
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                {/* Banner Header */}
+                <View style={styles.bannerContainer}>
+                    <View style={styles.banner} />
+
+                    {/* Avatar */}
+                    <TouchableOpacity
+                        style={styles.avatarWrapper}
+                        onPress={pickImage}
+                        disabled={uploading}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.avatarBorder}>
                             {profile?.avatarUrl ? (
-                                <Avatar.Image size={100} source={{ uri: profile.avatarUrl }} />
+                                <Image
+                                    source={{ uri: profile.avatarUrl }}
+                                    style={styles.avatar}
+                                />
                             ) : (
-                                <Avatar.Text size={100} label={profile?.displayName?.substring(0, 2).toUpperCase() || '??'} style={{ backgroundColor: '#5865F2' }} />
+                                <View style={styles.avatarPlaceholder}>
+                                    <Text style={styles.avatarText}>
+                                        {profile?.displayName?.substring(0, 2).toUpperCase() || '??'}
+                                    </Text>
+                                </View>
                             )}
-                            <View style={styles.editIcon}>
-                                <IconSymbol name="pencil" size={16} color="white" />
-                            </View>
                         </View>
+                        <View style={styles.editBadge}>
+                            <IconButton
+                                icon="pencil"
+                                size={14}
+                                iconColor={DISCORD.white}
+                                style={{ margin: 0 }}
+                            />
+                        </View>
+                        {/* Online Status */}
+                        <View style={styles.statusBadge} />
                     </TouchableOpacity>
-                    <Text style={styles.displayName}>{profile?.displayName || 'Người dùng'}</Text>
-                    <Text style={styles.username}>@{profile?.username}</Text>
                 </View>
 
-                <Divider style={styles.divider} />
+                {/* Profile Card */}
+                <View style={styles.profileCard}>
+                    {/* Name & Username */}
+                    <View style={styles.nameSection}>
+                        <Text style={styles.displayName}>{profile?.displayName || 'Người dùng'}</Text>
+                        <Text style={styles.username}>@{profile?.username}</Text>
+                    </View>
 
-                {/* Thông tin cá nhân */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Thông tin tài khoản</Text>
+                    {/* Divider */}
+                    <View style={styles.cardDivider} />
 
-                    <ProfileItem
+                    {/* About Me */}
+                    <View style={styles.aboutSection}>
+                        <Text style={styles.sectionLabel}>GIỚI THIỆU</Text>
+                        <Text style={styles.aboutText}>
+                            {profile?.bio || 'Chưa có giới thiệu'}
+                        </Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View style={styles.cardDivider} />
+
+                    {/* Member Since */}
+                    <View style={styles.aboutSection}>
+                        <Text style={styles.sectionLabel}>THÀNH VIÊN TỪ</Text>
+                        <Text style={styles.aboutText}>
+                            {new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Settings Sections */}
+                <View style={styles.settingsSection}>
+                    <Text style={styles.settingsSectionTitle}>CÀI ĐẶT TÀI KHOẢN</Text>
+
+                    <SettingsItem
+                        icon="account-edit"
                         label="Tên hiển thị"
                         value={profile?.displayName || 'Chưa đặt'}
-                        onPress={() => { setNewName(profile?.displayName || ''); setVisibleNameModal(true); }}
+                        onPress={() => setVisibleNameModal(true)}
                     />
-                    <ProfileItem
-                        label="Bio"
-                        value={profile?.bio || 'Chưa có giới thiệu'}
-                        onPress={() => { /* TODO: Add Bio Modal or merge into Name Modal */ }}
-                    // For now just read-only or placeholder
-                    />
-
-                    <ProfileItem
+                    <SettingsItem
+                        icon="email"
                         label="Email"
                         value={profile?.email || 'Chưa liên kết'}
-                        onPress={() => {
-                            // setNewEmail(''); setVisibleEmailModal(true); 
-                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
-                        }}
-                        secure={false}
+                        onPress={() => Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ')}
                     />
-                    <ProfileItem
+                    <SettingsItem
+                        icon="phone"
                         label="Số điện thoại"
                         value={profile?.phoneNumber || 'Chưa liên kết'}
-                        onPress={() => {
-                            // setNewPhone(''); setVisiblePhoneModal(true); 
-                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
-                        }}
+                        onPress={() => Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ')}
                     />
                 </View>
 
-                <Divider style={styles.divider} />
+                <View style={styles.settingsSection}>
+                    <Text style={styles.settingsSectionTitle}>BẢO MẬT</Text>
 
-                {/* Bảo mật */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Bảo mật</Text>
-                    <ProfileItem
+                    <SettingsItem
+                        icon="lock"
                         label="Mật khẩu"
-                        value="********"
-                        onPress={() => {
-                            // setOldPass(''); setNewPass(''); setConfirmPass(''); setVisiblePassModal(true); 
-                            Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ bởi Server');
-                        }}
+                        value="••••••••"
+                        onPress={() => Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ')}
+                    />
+                    <SettingsItem
+                        icon="shield-check"
+                        label="Xác thực hai yếu tố"
+                        value="Chưa bật"
+                        onPress={() => Alert.alert('Thông báo', 'Tính năng chưa được hỗ trợ')}
                     />
                 </View>
 
-                <View style={styles.section}>
-                    <Button mode="contained" onPress={handleLogout} buttonColor="#DA373C" style={{ marginTop: 20 }}>
-                        Đăng xuất
-                    </Button>
-                </View>
+                {/* Logout Button */}
+                <TouchableOpacity
+                    style={styles.logoutButton}
+                    onPress={handleLogout}
+                    activeOpacity={0.8}
+                >
+                    <IconButton icon="logout" size={20} iconColor={DISCORD.red} style={{ margin: 0 }} />
+                    <Text style={styles.logoutText}>Đăng xuất</Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 40 }} />
 
                 {/* Modals */}
                 <Portal>
-                    {/* Modal Đổi Tên */}
-                    <Modal visible={visibleNameModal} onDismiss={() => setVisibleNameModal(false)} contentContainerStyle={styles.modalContent}>
+                    <Modal
+                        visible={visibleNameModal}
+                        onDismiss={() => setVisibleNameModal(false)}
+                        contentContainerStyle={styles.modalContainer}
+                    >
                         <Text style={styles.modalTitle}>Đổi tên hiển thị</Text>
-                        <TextInput mode="outlined" value={newName} onChangeText={setNewName} label="Tên mới" style={styles.input} />
-                        <Button mode="contained" onPress={updateName}>Lưu</Button>
-                    </Modal>
-
-                    {/* Modal Đổi Pass */}
-                    <Modal visible={visiblePassModal} onDismiss={() => setVisiblePassModal(false)} contentContainerStyle={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Đổi mật khẩu</Text>
-                        <TextInput mode="outlined" value={oldPass} onChangeText={setOldPass} label="Mật khẩu cũ" secureTextEntry style={styles.input} />
-                        <TextInput mode="outlined" value={newPass} onChangeText={setNewPass} label="Mật khẩu mới" secureTextEntry style={styles.input} />
-                        <TextInput mode="outlined" value={confirmPass} onChangeText={setConfirmPass} label="Xác nhận mật khẩu mới" secureTextEntry style={styles.input} />
-                        <Button mode="contained" onPress={updatePassword}>Đổi mật khẩu</Button>
-                    </Modal>
-
-                    {/* Modal SĐT */}
-                    <Modal visible={visiblePhoneModal} onDismiss={() => setVisiblePhoneModal(false)} contentContainerStyle={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Đổi số điện thoại</Text>
-                        <TextInput mode="outlined" value={newPhone} onChangeText={setNewPhone} label="Số điện thoại mới" keyboardType="phone-pad" style={styles.input} />
-                        <Button mode="contained" onPress={initiateChangePhone}>Gửi mã xác thực</Button>
-                    </Modal>
-
-                    {/* Modal Email */}
-                    <Modal visible={visibleEmailModal} onDismiss={() => setVisibleEmailModal(false)} contentContainerStyle={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Đổi Email</Text>
-                        <TextInput mode="outlined" value={newEmail} onChangeText={setNewEmail} label="Email mới" keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-                        <Button mode="contained" onPress={initiateChangeEmail}>Gửi mã xác thực</Button>
-                    </Modal>
-
-                    {/* Modal OTP */}
-                    <Modal visible={visibleOtpModal} onDismiss={() => setVisibleOtpModal(false)} contentContainerStyle={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Nhập mã xác thực</Text>
-                        <Text style={{ marginBottom: 10, textAlign: 'center' }}>Đã gửi mã đến {otpContext === 'PHONE' ? newPhone : newEmail}</Text>
-                        <TextInput mode="outlined" value={otp} onChangeText={setOtp} label="OTP" keyboardType="number-pad" style={styles.input} />
-                        <Button mode="contained" onPress={verifyOtp}>Xác nhận</Button>
+                        <Text style={styles.modalLabel}>TÊN HIỂN THỊ</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            value={newName}
+                            onChangeText={setNewName}
+                            placeholder="Nhập tên của bạn"
+                            placeholderTextColor={DISCORD.textDark}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.modalCancelButton}
+                                onPress={() => setVisibleNameModal(false)}
+                            >
+                                <Text style={styles.modalCancelText}>Hủy</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalSaveButton}
+                                onPress={updateName}
+                            >
+                                <Text style={styles.modalSaveText}>Lưu</Text>
+                            </TouchableOpacity>
+                        </View>
                     </Modal>
                 </Portal>
-
             </ScrollView>
         </PaperProvider>
     );
 }
 
-const ProfileItem = ({ label, value, onPress, secure }: any) => (
-    <TouchableOpacity onPress={onPress}>
-        <View style={styles.itemContainer}>
+// Settings Item Component
+const SettingsItem = ({ icon, label, value, onPress }: { icon: string; label: string; value: string; onPress: () => void }) => (
+    <TouchableOpacity style={styles.settingsItem} onPress={onPress} activeOpacity={0.7}>
+        <View style={styles.settingsItemLeft}>
+            <IconButton icon={icon} size={22} iconColor={DISCORD.textMuted} style={{ margin: 0, marginRight: 12 }} />
             <View>
-                <Text style={styles.itemLabel}>{label}</Text>
-                <Text style={styles.itemValue}>{value}</Text>
+                <Text style={styles.settingsItemLabel}>{label}</Text>
+                <Text style={styles.settingsItemValue}>{value}</Text>
             </View>
-            <IconSymbol name="chevron.right" size={20} color="#B5BAC1" />
         </View>
+        <IconButton icon="chevron-right" size={20} iconColor={DISCORD.textDark} style={{ margin: 0 }} />
     </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#313338',
+        backgroundColor: DISCORD.darkerBg,
     },
-    center: {
+    loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#313338',
+        backgroundColor: DISCORD.darkBg,
     },
-    header: {
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#1E1F22',
-    },
-    avatarContainer: {
+    // Banner
+    bannerContainer: {
+        height: 160,
         position: 'relative',
-        marginBottom: 10,
     },
-    editIcon: {
+    banner: {
+        height: 120,
+        backgroundColor: DISCORD.banner,
+    },
+    avatarWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 20,
+    },
+    avatarBorder: {
+        width: 92,
+        height: 92,
+        borderRadius: 46,
+        backgroundColor: DISCORD.darkerBg,
+        padding: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+    },
+    avatarPlaceholder: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: DISCORD.blurple,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        color: DISCORD.white,
+        fontSize: 28,
+        fontWeight: '700',
+    },
+    editBadge: {
         position: 'absolute',
         right: 0,
-        bottom: 0,
-        backgroundColor: '#5865F2',
-        borderRadius: 15,
-        width: 30,
-        height: 30,
+        bottom: 4,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: DISCORD.blurple,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
-        borderColor: '#1E1F22',
+        borderColor: DISCORD.darkerBg,
     },
-    displayName: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#F2F3F5',
+    statusBadge: {
+        position: 'absolute',
+        right: 6,
+        bottom: 6,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: DISCORD.green,
+        borderWidth: 4,
+        borderColor: DISCORD.darkerBg,
     },
-    username: {
-        fontSize: 16,
-        color: '#B5BAC1',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#26272D',
-    },
-    section: {
+    // Profile Card
+    profileCard: {
+        backgroundColor: DISCORD.cardBg,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 8,
         padding: 16,
     },
-    sectionTitle: {
+    nameSection: {
+        marginBottom: 12,
+    },
+    displayName: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: DISCORD.text,
+    },
+    username: {
+        fontSize: 14,
+        color: DISCORD.textMuted,
+        marginTop: 2,
+    },
+    cardDivider: {
+        height: 1,
+        backgroundColor: DISCORD.divider,
+        marginVertical: 12,
+    },
+    aboutSection: {
+    },
+    sectionLabel: {
         fontSize: 12,
-        fontWeight: 'bold',
-        color: '#B5BAC1',
+        fontWeight: '700',
+        color: DISCORD.textMuted,
+        marginBottom: 6,
+        letterSpacing: 0.5,
+    },
+    aboutText: {
+        fontSize: 14,
+        color: DISCORD.text,
+        lineHeight: 20,
+    },
+    // Settings
+    settingsSection: {
+        marginHorizontal: 16,
+        marginTop: 24,
+    },
+    settingsSectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: DISCORD.textMuted,
         marginBottom: 8,
-        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    itemContainer: {
+    settingsItem: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: DISCORD.cardBg,
         paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 4,
+        marginBottom: 2,
     },
-    itemLabel: {
-        color: '#F2F3F5',
+    settingsItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    settingsItemLabel: {
         fontSize: 16,
+        color: DISCORD.text,
         fontWeight: '500',
     },
-    itemValue: {
-        color: '#B5BAC1',
-        fontSize: 14,
-        marginTop: 4,
+    settingsItemValue: {
+        fontSize: 13,
+        color: DISCORD.textMuted,
+        marginTop: 2,
     },
-    // Modal styles
-    modalContent: {
-        backgroundColor: 'white',
-        padding: 20,
-        margin: 20,
+    // Logout
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 16,
+        marginTop: 24,
+        paddingVertical: 12,
+        backgroundColor: DISCORD.cardBg,
+        borderRadius: 4,
+    },
+    logoutText: {
+        fontSize: 16,
+        color: DISCORD.red,
+        fontWeight: '600',
+    },
+    // Modal
+    modalContainer: {
+        backgroundColor: DISCORD.cardBg,
+        marginHorizontal: 20,
         borderRadius: 8,
+        padding: 20,
     },
     modalTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 15,
-        textAlign: 'center',
-        color: '#333'
+        fontWeight: '700',
+        color: DISCORD.text,
+        marginBottom: 20,
     },
-    input: {
-        marginBottom: 15,
-    }
+    modalLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: DISCORD.textMuted,
+        marginBottom: 8,
+        letterSpacing: 0.5,
+    },
+    modalInput: {
+        backgroundColor: DISCORD.inputBg,
+        borderRadius: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: DISCORD.text,
+        marginBottom: 20,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    modalCancelButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginRight: 8,
+    },
+    modalCancelText: {
+        fontSize: 14,
+        color: DISCORD.textMuted,
+        fontWeight: '500',
+    },
+    modalSaveButton: {
+        backgroundColor: DISCORD.blurple,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 4,
+    },
+    modalSaveText: {
+        fontSize: 14,
+        color: DISCORD.white,
+        fontWeight: '600',
+    },
 });

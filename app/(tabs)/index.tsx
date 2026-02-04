@@ -1,6 +1,8 @@
 import { DMChannel, homeApi, User } from '@/src/api/homeApi';
 import { serverApi, ServerResponse } from '@/src/api/serverApi';
+import { ChatArea } from '@/src/components/ChatArea';
 import { InputModal } from '@/src/components/InputModal';
+import { JoinServerModal } from '@/src/components/JoinServerModal';
 import { ServerChannelList } from '@/src/components/ServerChannelList';
 import { logout } from '@/src/store/slices/authSlice';
 import { storage } from '@/src/utils/storage';
@@ -32,6 +34,8 @@ export default function HomeScreen() {
     const [servers, setServers] = useState<ServerUI[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedServerId, setSelectedServerId] = useState<string>('dm');
+    const [selectedChannel, setSelectedChannel] = useState<{ id: number; name: string } | null>(null);
+    const [isChatFullscreen, setIsChatFullscreen] = useState(false);
 
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +102,7 @@ export default function HomeScreen() {
     };
 
     const [createModalVisible, setCreateModalVisible] = useState(false);
+    const [joinModalVisible, setJoinModalVisible] = useState(false);
 
     const handleCreateServer = async (name: string) => {
         if (name) {
@@ -114,6 +119,16 @@ export default function HomeScreen() {
                 Alert.alert("Error", "Could not create server");
             }
         }
+    };
+
+    const handleJoinSuccess = (server: ServerResponse) => {
+        setServers(prev => [...prev, {
+            id: server.id.toString(),
+            name: server.name,
+            iconUrl: server.iconUrl,
+            hasUnread: false,
+            mentions: 0
+        }]);
     };
 
 
@@ -232,28 +247,36 @@ export default function HomeScreen() {
         <SafeAreaView className="flex-1 bg-discord-background flex-row" edges={['top']}>
             <StatusBar style="light" backgroundColor="#1E1F22" />
 
-            {/* Sidebar (Servers) */}
-            <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full flex">
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }}>
-                    <View className="mb-2 relative w-full items-center justify-center">
-                        {selectedServerId === 'dm' && <View className="absolute left-0 w-1 h-10 bg-white rounded-r-lg" />}
+            {/* Sidebar (Servers) - Hidden when chat is fullscreen */}
+            {!isChatFullscreen && (
+                <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full flex">
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }}>
+                        <View className="mb-2 relative w-full items-center justify-center">
+                            {selectedServerId === 'dm' && <View className="absolute left-0 w-1 h-10 bg-white rounded-r-lg" />}
+                            <TouchableOpacity
+                                className={`w-12 h-12 rounded-[24px] items-center justify-center overflow-hidden transition-all ${selectedServerId === 'dm' ? 'rounded-[16px] bg-discord-brand' : 'bg-discord-element group-active:rounded-[16px] group-active:bg-discord-brand'}`}
+                                onPress={() => setSelectedServerId('dm')}
+                            >
+                                <IconButton icon="message-text" size={24} iconColor={selectedServerId === 'dm' ? 'white' : '#DBDEE1'} style={{ margin: 0 }} />
+                            </TouchableOpacity>
+                        </View>
+                        <View className="w-8 h-[2px] bg-discord-divider mb-2 rounded-full" />
+                        {servers.map(renderServerItem)}
                         <TouchableOpacity
-                            className={`w-12 h-12 rounded-[24px] items-center justify-center overflow-hidden transition-all ${selectedServerId === 'dm' ? 'rounded-[16px] bg-discord-brand' : 'bg-discord-element group-active:rounded-[16px] group-active:bg-discord-brand'}`}
-                            onPress={() => setSelectedServerId('dm')}
+                            className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2"
+                            onPress={() => setCreateModalVisible(true)}
                         >
-                            <IconButton icon="message-text" size={24} iconColor={selectedServerId === 'dm' ? 'white' : '#DBDEE1'} style={{ margin: 0 }} />
+                            <IconButton icon="plus" size={24} iconColor="#23A559" style={{ margin: 0 }} />
                         </TouchableOpacity>
-                    </View>
-                    <View className="w-8 h-[2px] bg-discord-divider mb-2 rounded-full" />
-                    {servers.map(renderServerItem)}
-                    <TouchableOpacity
-                        className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2"
-                        onPress={() => setCreateModalVisible(true)}
-                    >
-                        <IconButton icon="plus" size={24} iconColor="#23A559" style={{ margin: 0 }} />
-                    </TouchableOpacity>
-                </ScrollView>
-            </View>
+                        <TouchableOpacity
+                            className="w-12 h-12 rounded-[24px] items-center justify-center bg-discord-background mt-2"
+                            onPress={() => setJoinModalVisible(true)}
+                        >
+                            <IconButton icon="compass" size={24} iconColor="#23A559" style={{ margin: 0 }} />
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
+            )}
 
             {/* Main Content */}
             {selectedServerId === 'dm' ? (
@@ -319,14 +342,32 @@ export default function HomeScreen() {
                     </View>
                 </View>
             ) : (
-                // SERVER VIEW
                 <View className="flex-1 flex-row">
-                    <ServerChannelList
-                        serverId={selectedServerId}
-                        serverName={servers.find(s => s.id === selectedServerId)?.name || 'Server'}
-                    />
-                    <View className="flex-1 bg-discord-background items-center justify-center">
-                        <Text className="text-discord-text-muted">Chat Area</Text>
+                    {/* Channel Sidebar - Hidden when chat is fullscreen */}
+                    {!isChatFullscreen && (
+                        <ServerChannelList
+                            serverId={selectedServerId}
+                            serverName={servers.find(s => s.id === selectedServerId)?.name || 'Server'}
+                            onChannelSelect={(id, name) => {
+                                setSelectedChannel({ id, name });
+                                setIsChatFullscreen(true);
+                            }}
+                        />
+                    )}
+                    <View className="flex-1 bg-discord-background">
+                        {selectedChannel && isChatFullscreen ? (
+                            <ChatArea
+                                channelId={selectedChannel.id}
+                                channelName={selectedChannel.name}
+                                onBack={() => setIsChatFullscreen(false)}
+                            />
+                        ) : !isChatFullscreen && selectedChannel ? (
+                            <ChatArea channelId={selectedChannel.id} channelName={selectedChannel.name} />
+                        ) : (
+                            <View className="flex-1 items-center justify-center">
+                                <Text className="text-discord-text-muted">Chọn một kênh để bắt đầu nhắn tin</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
             )}
@@ -338,6 +379,12 @@ export default function HomeScreen() {
                 label="Tên máy chủ"
                 placeholder="Nhập tên..."
                 onConfirm={handleCreateServer}
+            />
+
+            <JoinServerModal
+                visible={joinModalVisible}
+                onDismiss={() => setJoinModalVisible(false)}
+                onJoinSuccess={handleJoinSuccess}
             />
         </SafeAreaView>
     );

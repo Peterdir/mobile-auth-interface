@@ -35,10 +35,20 @@ export const apiClient = {
             const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
             clearTimeout(timeoutId);
 
-            if (response.status === 401) {
-                // Handle unauthorized (logout or refresh token)
-                // For now just throw error
-                throw new Error('Unauthorized');
+            if (response.status === 401 || response.status === 403) {
+                // Clear session if unauthorized to prevent loop
+                // But only if it's not a login/register endpoint (which return 400 for bad creds usually, but just in case)
+                if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+                    await storage.clearAll();
+                    // Optional: You might want to trigger a global logout action via Redux if accessible,
+                    // or rely on the UI to react to empty storage/state on next reload.
+                    // For immediate effect if using expo-router:
+                    // router.replace('/(auth)/login') - but router is not accessible here easily without passing it in.
+                    // Best way is to throw error, let UI handle or use a global event emitter.
+                    // For now, clearing storage ensures next app reload prompts login.
+                    console.warn("Session expired or unauthorized. Clearing session.");
+                }
+                throw new Error('Unauthorized - Session Cleared');
             }
 
             if (!response.ok) {
@@ -50,6 +60,11 @@ export const apiClient = {
             const text = await response.text();
             return text ? JSON.parse(text) : {} as T;
         } catch (error) {
+            console.error('API Request Error Details:', {
+                endpoint,
+                status: (error as any)?.status,
+                message: (error as any)?.message
+            });
             console.error('API Request Error:', error);
             throw error;
         }

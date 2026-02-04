@@ -1,8 +1,20 @@
 import { Link, useRouter } from 'expo-router';
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { registerUser } from "../api/authApi";
-import { COLORS } from '../constants/colors';
+
+// Discord Colors
+const DISCORD = {
+    blurple: '#5865F2',
+    green: '#57F287',
+    red: '#ED4245',
+    white: '#FFFFFF',
+    darkerBg: '#111214',
+    inputBg: '#1E1F22',
+    text: '#F2F3F5',
+    textMuted: '#B5BAC1',
+    textDark: '#949BA4',
+};
 
 export default function RegisterScreen() {
     const router = useRouter();
@@ -13,9 +25,9 @@ export default function RegisterScreen() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleRegister = async () => {
-        // Validate inputs
         if (!username || !displayName || !email || !password || !confirmPassword) {
             Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
             return;
@@ -31,7 +43,6 @@ export default function RegisterScreen() {
             return;
         }
 
-        // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             Alert.alert('Lỗi', 'Email không hợp lệ');
@@ -43,7 +54,6 @@ export default function RegisterScreen() {
             const result = await registerUser(username, email, password, displayName);
 
             if (result.email) {
-                // Đăng ký thành công -> chuyển sang màn OTP
                 Alert.alert('Thành công', result.message, [
                     {
                         text: 'OK',
@@ -56,7 +66,6 @@ export default function RegisterScreen() {
                     }
                 ]);
             } else {
-                // Đăng ký thất bại
                 Alert.alert('Lỗi', result.message);
             }
         } catch (error) {
@@ -68,63 +77,124 @@ export default function RegisterScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Register</Text>
+            <StatusBar barStyle="light-content" backgroundColor={DISCORD.darkerBg} />
 
-            <TextInput
-                placeholder="Username"
-                style={styles.input}
-                keyboardType="default"
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
-            />
-
-            <TextInput
-                placeholder="Display Name"
-                style={styles.input}
-                keyboardType="default"
-                value={displayName}
-                onChangeText={setDisplayName}
-            />
-
-            <TextInput
-                placeholder="Email"
-                style={styles.input}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-            />
-
-            <TextInput
-                placeholder="Password"
-                style={styles.input}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-            />
-
-            <TextInput
-                placeholder="Confirm Password"
-                style={styles.input}
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-            />
-
-            <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleRegister}
-                disabled={loading}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.keyboardView}
             >
-                <Text style={styles.buttonText}>
-                    {loading ? 'Đang đăng ký...' : 'Register'}
-                </Text>
-            </TouchableOpacity>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Header */}
+                    <View style={styles.headerSection}>
+                        <Text style={styles.title}>Tạo tài khoản</Text>
+                    </View>
 
-            <Link href="/(auth)/login" style={styles.link}>
-                Already have an account? Login
-            </Link>
+                    {/* Form */}
+                    <View style={styles.formSection}>
+                        {/* Email */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>EMAIL <Text style={styles.required}>*</Text></Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={DISCORD.textDark}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={email}
+                                onChangeText={setEmail}
+                            />
+                        </View>
+
+                        {/* Display Name */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>TÊN HIỂN THỊ <Text style={styles.required}>*</Text></Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={DISCORD.textDark}
+                                value={displayName}
+                                onChangeText={setDisplayName}
+                            />
+                        </View>
+
+                        {/* Username */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>TÊN NGƯỜI DÙNG <Text style={styles.required}>*</Text></Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={DISCORD.textDark}
+                                autoCapitalize="none"
+                                value={username}
+                                onChangeText={setUsername}
+                            />
+                        </View>
+
+                        {/* Password */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>MẬT KHẨU <Text style={styles.required}>*</Text></Text>
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={styles.passwordInput}
+                                    placeholderTextColor={DISCORD.textDark}
+                                    secureTextEntry={!showPassword}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    autoCapitalize="none"
+                                />
+                                <TouchableOpacity
+                                    style={styles.eyeButton}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Confirm Password */}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>XÁC NHẬN MẬT KHẨU <Text style={styles.required}>*</Text></Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholderTextColor={DISCORD.textDark}
+                                secureTextEntry={!showPassword}
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                autoCapitalize="none"
+                            />
+                        </View>
+
+                        {/* Terms */}
+                        <Text style={styles.termsText}>
+                            Khi đăng ký, bạn đồng ý với{' '}
+                            <Text style={styles.termsLink}>Điều khoản dịch vụ</Text> và{' '}
+                            <Text style={styles.termsLink}>Chính sách quyền riêng tư</Text> của Discord.
+                        </Text>
+
+                        {/* Register Button */}
+                        <TouchableOpacity
+                            style={[styles.registerButton, loading && styles.buttonDisabled]}
+                            onPress={handleRegister}
+                            disabled={loading}
+                            activeOpacity={0.8}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color={DISCORD.white} size="small" />
+                            ) : (
+                                <Text style={styles.registerButtonText}>Tiếp tục</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Login Link */}
+                        <Link href="/(auth)/login" asChild>
+                            <TouchableOpacity style={styles.loginLinkContainer}>
+                                <Text style={styles.loginLink}>Đã có tài khoản?</Text>
+                            </TouchableOpacity>
+                        </Link>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -132,41 +202,102 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        padding: 24,
-        backgroundColor: COLORS.background,
+        backgroundColor: DISCORD.darkerBg,
+    },
+    keyboardView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: 20,
+        paddingVertical: 40,
+    },
+    headerSection: {
+        alignItems: 'center',
+        marginBottom: 24,
+        marginTop: 20,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
+        color: DISCORD.text,
         textAlign: 'center',
-        marginBottom: 32,
-        color: COLORS.text,
     },
-    input: {
-        borderWidth: 1,
-        borderColor: COLORS.gray,
-        borderRadius: 8,
-        padding: 14,
+    formSection: {
+        width: '100%',
+    },
+    inputGroup: {
         marginBottom: 16,
     },
-    button: {
-        backgroundColor: COLORS.primary,
-        padding: 14,
-        borderRadius: 8,
-        marginTop: 8,
+    inputLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: DISCORD.textMuted,
+        marginBottom: 8,
+        letterSpacing: 0.5,
+    },
+    required: {
+        color: DISCORD.red,
+    },
+    input: {
+        backgroundColor: DISCORD.inputBg,
+        borderRadius: 4,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: DISCORD.text,
+    },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: DISCORD.inputBg,
+        borderRadius: 4,
+    },
+    passwordInput: {
+        flex: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: DISCORD.text,
+    },
+    eyeButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    eyeIcon: {
+        fontSize: 18,
+    },
+    termsText: {
+        fontSize: 12,
+        color: DISCORD.textDark,
+        lineHeight: 18,
+        marginBottom: 20,
+    },
+    termsLink: {
+        color: DISCORD.blurple,
+    },
+    registerButton: {
+        backgroundColor: DISCORD.blurple,
+        borderRadius: 4,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     buttonDisabled: {
-        opacity: 0.6,
+        opacity: 0.7,
     },
-    buttonText: {
-        color: '#fff',
+    registerButtonText: {
+        color: DISCORD.white,
+        fontSize: 16,
         fontWeight: '600',
-        textAlign: 'center',
     },
-    link: {
-        marginTop: 16,
-        textAlign: 'center',
-        color: COLORS.primary,
+    loginLinkContainer: {
+        alignItems: 'flex-start',
+    },
+    loginLink: {
+        fontSize: 14,
+        color: DISCORD.blurple,
+        fontWeight: '500',
     },
 });

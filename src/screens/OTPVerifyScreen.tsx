@@ -1,19 +1,31 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+// Discord Colors
+const DISCORD = {
+    blurple: '#5865F2',
+    green: '#57F287',
+    red: '#ED4245',
+    white: '#FFFFFF',
+    darkerBg: '#111214',
+    inputBg: '#1E1F22',
+    text: '#F2F3F5',
+    textMuted: '#B5BAC1',
+    textDark: '#949BA4',
+};
+
 import { resendOtp, verifyAccount } from "../api/authApi";
-import { COLORS } from '../constants/colors';
 
 export default function OTPVerifyScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{ email: string; type: 'VERIFY_ACCOUNT' | 'RESET_PASSWORD' }>();
 
-    const [otp, setOtp] = useState('');
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     const [countdown, setCountdown] = useState(0);
 
-    // Countdown timer for resend button
     useEffect(() => {
         if (countdown > 0) {
             const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -21,8 +33,22 @@ export default function OTPVerifyScreen() {
         }
     }, [countdown]);
 
+    const handleOtpChange = (value: string, index: number) => {
+        if (value.length > 1) value = value[0];
+        const newOtp = [...otp];
+        newOtp[index] = value;
+        setOtp(newOtp);
+
+        // Auto focus next input
+        if (value && index < 5) {
+            const nextInput = document.getElementById(`otp-${index + 1}`);
+            nextInput?.focus();
+        }
+    };
+
     const handleVerify = async () => {
-        if (!otp || otp.length !== 6) {
+        const otpString = otp.join('');
+        if (otpString.length !== 6) {
             Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ mã OTP 6 số');
             return;
         }
@@ -35,8 +61,7 @@ export default function OTPVerifyScreen() {
         setLoading(true);
         try {
             if (params.type === 'VERIFY_ACCOUNT') {
-                // Xác thực tài khoản (đăng ký mới)
-                const result = await verifyAccount(params.email, otp);
+                const result = await verifyAccount(params.email, otpString);
 
                 if (result.message?.includes('thành công')) {
                     Alert.alert('Thành công', result.message, [
@@ -49,10 +74,9 @@ export default function OTPVerifyScreen() {
                     Alert.alert('Lỗi', result.message || 'Xác thực thất bại');
                 }
             } else if (params.type === 'RESET_PASSWORD') {
-                // Chuyển sang màn reset password với OTP đã xác thực
                 router.push({
                     pathname: '/(auth)/reset-password',
-                    params: { email: params.email, otp: otp }
+                    params: { email: params.email, otp: otpString }
                 });
             }
         } catch (error) {
@@ -74,7 +98,7 @@ export default function OTPVerifyScreen() {
 
             if (result.email) {
                 Alert.alert('Thành công', result.message);
-                setCountdown(60); // Chờ 60 giây trước khi gửi lại
+                setCountdown(60);
             } else {
                 Alert.alert('Lỗi', result.message || 'Gửi lại OTP thất bại');
             }
@@ -91,44 +115,76 @@ export default function OTPVerifyScreen() {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>{getTitle()}</Text>
+            <StatusBar barStyle="light-content" backgroundColor={DISCORD.darkerBg} />
 
-            <Text style={styles.description}>
-                Chúng tôi đã gửi mã xác thực đến email:{'\n'}
-                <Text style={styles.email}>{params.email}</Text>
-            </Text>
-
-            <TextInput
-                placeholder="Nhập mã OTP 6 số"
-                style={styles.input}
-                keyboardType="number-pad"
-                maxLength={6}
-                value={otp}
-                onChangeText={setOtp}
-            />
-
-            <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleVerify}
-                disabled={loading}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.keyboardView}
             >
-                <Text style={styles.buttonText}>
-                    {loading ? 'Đang xác thực...' : 'Xác thực'}
-                </Text>
-            </TouchableOpacity>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Icon */}
+                    <View style={styles.iconContainer}>
+                        <Text style={styles.icon}>📧</Text>
+                    </View>
 
-            <TouchableOpacity
-                onPress={handleResendOtp}
-                disabled={resending || countdown > 0}
-            >
-                <Text style={[styles.link, (resending || countdown > 0) && styles.linkDisabled]}>
-                    {countdown > 0
-                        ? `Gửi lại mã sau ${countdown}s`
-                        : resending
-                            ? 'Đang gửi...'
-                            : "Không nhận được mã? Gửi lại"}
-                </Text>
-            </TouchableOpacity>
+                    <Text style={styles.title}>{getTitle()}</Text>
+
+                    <Text style={styles.description}>
+                        Chúng tôi đã gửi mã xác thực đến email
+                    </Text>
+                    <Text style={styles.email}>{params.email}</Text>
+
+                    {/* OTP Input */}
+                    <View style={styles.otpContainer}>
+                        <TextInput
+                            style={styles.otpInput}
+                            value={otp.join('')}
+                            onChangeText={(text) => {
+                                const chars = text.slice(0, 6).split('');
+                                const newOtp = [...chars, '', '', '', '', '', ''].slice(0, 6);
+                                setOtp(newOtp);
+                            }}
+                            keyboardType="number-pad"
+                            maxLength={6}
+                            placeholder="000000"
+                            placeholderTextColor={DISCORD.textDark}
+                        />
+                    </View>
+
+                    {/* Verify Button */}
+                    <TouchableOpacity
+                        style={[styles.verifyButton, loading && styles.buttonDisabled]}
+                        onPress={handleVerify}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color={DISCORD.white} size="small" />
+                        ) : (
+                            <Text style={styles.verifyButtonText}>Xác thực</Text>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* Resend */}
+                    <TouchableOpacity
+                        onPress={handleResendOtp}
+                        disabled={resending || countdown > 0}
+                        style={styles.resendContainer}
+                    >
+                        <Text style={[styles.resendText, (resending || countdown > 0) && styles.resendDisabled]}>
+                            {countdown > 0
+                                ? `Gửi lại mã sau ${countdown}s`
+                                : resending
+                                    ? 'Đang gửi...'
+                                    : "Không nhận được mã? Gửi lại"}
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </View>
     );
 }
@@ -136,59 +192,83 @@ export default function OTPVerifyScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: DISCORD.darkerBg,
+    },
+    keyboardView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
         justifyContent: 'center',
-        padding: 24,
-        backgroundColor: COLORS.background,
+        paddingHorizontal: 24,
+        paddingVertical: 40,
+    },
+    iconContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    icon: {
+        fontSize: 64,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         textAlign: 'center',
-        marginBottom: 16,
-        color: COLORS.text,
+        marginBottom: 12,
+        color: DISCORD.text,
     },
     description: {
-        fontSize: 16,
+        fontSize: 15,
         textAlign: 'center',
-        marginBottom: 32,
-        color: COLORS.text,
-        lineHeight: 24,
+        color: DISCORD.textMuted,
+        marginBottom: 4,
     },
     email: {
+        fontSize: 15,
         fontWeight: '600',
-        color: COLORS.primary,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: COLORS.gray,
-        borderRadius: 8,
-        padding: 14,
-        marginBottom: 16,
+        color: DISCORD.blurple,
         textAlign: 'center',
-        fontSize: 24,
-        letterSpacing: 8,
-        fontWeight: '600',
+        marginBottom: 32,
     },
-    button: {
-        backgroundColor: COLORS.primary,
-        padding: 14,
-        borderRadius: 8,
+    otpContainer: {
+        marginBottom: 24,
+    },
+    otpInput: {
+        backgroundColor: DISCORD.inputBg,
+        borderRadius: 4,
+        paddingVertical: 16,
+        fontSize: 32,
+        fontWeight: '700',
+        color: DISCORD.text,
+        textAlign: 'center',
+        letterSpacing: 12,
+    },
+    verifyButton: {
+        backgroundColor: DISCORD.blurple,
+        borderRadius: 4,
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: 16,
     },
     buttonDisabled: {
-        opacity: 0.6,
+        opacity: 0.7,
     },
-    buttonText: {
-        color: '#fff',
+    verifyButtonText: {
+        color: DISCORD.white,
+        fontSize: 16,
         fontWeight: '600',
-        textAlign: 'center',
     },
-    link: {
-        marginTop: 16,
-        textAlign: 'center',
-        color: COLORS.primary,
+    resendContainer: {
+        alignItems: 'center',
+        marginTop: 8,
     },
-    linkDisabled: {
-        color: COLORS.gray,
+    resendText: {
+        fontSize: 14,
+        color: DISCORD.blurple,
+        fontWeight: '500',
+    },
+    resendDisabled: {
+        color: DISCORD.textDark,
     },
 });

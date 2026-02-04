@@ -1,4 +1,14 @@
 import { Stack, useRouter } from 'expo-router';
+import { TextDecoder, TextEncoder } from 'text-encoding';
+
+// Polyfill for StompJS
+if (typeof global.TextEncoder === 'undefined') {
+  global.TextEncoder = TextEncoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = TextDecoder;
+}
+
 import { useEffect } from 'react';
 import { MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import { Provider, useDispatch } from 'react-redux';
@@ -29,8 +39,38 @@ function AppContent() {
       const token = await storage.getToken();
 
       if (userInfo && token) {
-        dispatch(login({ ...userInfo, token }));
-        // setTimeout to ensure navigation is ready or just proceed
+        let finalUserInfo = { ...userInfo, token };
+
+        // Fetch đầy đủ thông tin user từ API
+        if (token) {
+          try {
+            const response = await fetch('http://10.0.2.2:8085/api/users/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (response.ok) {
+              const userData = await response.json();
+              // Lưu toàn bộ thông tin user
+              finalUserInfo = {
+                ...userInfo,
+                id: userData.id,
+                username: userData.username,
+                displayName: userData.displayName,
+                avatarUrl: userData.avatarUrl,
+                email: userData.email,
+                token
+              };
+              // Cập nhật storage với thông tin đầy đủ
+              await storage.saveUserInfo(finalUserInfo);
+            }
+          } catch (error) {
+            console.error('Failed to fetch user info:', error);
+          }
+        }
+
+        dispatch(login(finalUserInfo));
         router.replace('/(tabs)');
       }
     };
