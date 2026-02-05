@@ -1,6 +1,8 @@
 import { DMChannel, homeApi, User } from '@/src/api/homeApi';
 import { serverApi, ServerResponse } from '@/src/api/serverApi';
 import { ChatArea } from '@/src/components/ChatArea';
+import { DirectMessageChatArea } from '@/src/components/DirectMessageChatArea';
+import { DirectMessageList } from '@/src/components/DirectMessageList';
 import { InputModal } from '@/src/components/InputModal';
 import { JoinServerModal } from '@/src/components/JoinServerModal';
 import { ServerChannelList } from '@/src/components/ServerChannelList';
@@ -9,7 +11,7 @@ import { storage } from '@/src/utils/storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Keyboard, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
@@ -35,6 +37,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [selectedServerId, setSelectedServerId] = useState<string>('dm');
     const [selectedChannel, setSelectedChannel] = useState<{ id: number; name: string } | null>(null);
+    const [selectedConversation, setSelectedConversation] = useState<{ conversationId: string; friendId: number; friendName: string } | null>(null);
     const [isChatFullscreen, setIsChatFullscreen] = useState(false);
 
     // Search State
@@ -279,67 +282,23 @@ export default function HomeScreen() {
             )}
 
             {/* Main Content */}
+            {/* DM VIEW */}
             {selectedServerId === 'dm' ? (
-                // DM VIEW
                 <View className="flex-1 bg-discord-background rounded-tl-[16px] overflow-hidden">
-                    <View className="px-4 pt-4 pb-2 bg-discord-background shadow-sm">
-                        <Text className="text-white font-bold text-2xl mb-1">Các tin nhắn</Text>
-
-                        {/* SEARCH BAR */}
-                        <View className="h-9 mb-4 flex-row items-center bg-discord-element rounded-md px-2">
-                            <TextInput
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                                placeholder="Tìm cuộc trò chuyện hoặc bắt đầu..."
-                                placeholderTextColor="#949BA4"
-                                className="flex-1 text-discord-text-normal text-sm h-full ml-1"
-                                onFocus={() => setIsSearching(true)}
-                                onBlur={() => setIsSearching(searchQuery.length > 0)}
-                            />
-                            {searchQuery.length > 0 ? (
-                                <TouchableOpacity onPress={() => { setSearchQuery(''); setIsSearching(false); Keyboard.dismiss(); }}>
-                                    <IconButton icon="close" size={20} iconColor="#949BA4" style={{ margin: 0 }} />
-                                </TouchableOpacity>
-                            ) : (
-                                <IconButton icon="magnify" size={20} iconColor="#949BA4" style={{ margin: 0 }} />
-                            )}
-                        </View>
-
-                        {/* Active Friends List - Hide when searching */}
-                        {!isSearching && searchQuery === '' && (
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2" contentContainerStyle={{ paddingRight: 10 }}>
-                                <View className="items-center mr-4 w-16">
-                                    <View className="w-14 h-14 rounded-full bg-discord-element items-center justify-center border-2 border-dashed border-gray-600 mb-1">
-                                        <IconButton icon="plus" size={24} iconColor="#949BA4" style={{ margin: 0 }} />
-                                    </View>
-                                    <Text className="text-discord-text-muted text-xs text-center" numberOfLines={1}>Thêm Bạn Bè</Text>
-                                </View>
-                                {activeFriends.map(friend => (
-                                    <View key={friend.id} className="items-center mr-4 w-16 relative">
-                                        <View className="relative mb-1">
-                                            <Image source={{ uri: friend.avatarUrl }} className="w-14 h-14 rounded-full bg-discord-element" />
-                                            <View className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[3px] border-discord-background ${getStatusColor(friend.status.type)}`} />
-                                        </View>
-                                        <Text className="text-discord-text-header text-xs text-center font-bold" numberOfLines={1}>{friend.username}</Text>
-                                    </View>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
-
-                    <View className="flex-1 bg-discord-background rounded-t-[20px] mt-2 overflow-hidden">
-                        <FlatList
-                            data={getFilteredData()}
-                            renderItem={renderDMItem}
-                            keyExtractor={item => item.id}
-                            contentContainerStyle={{ paddingBottom: 80 }}
-                            ListEmptyComponent={
-                                <View className="items-center justify-center mt-10">
-                                    <Text className="text-discord-text-muted">Không tìm thấy kết quả nào.</Text>
-                                </View>
-                            }
+                    {selectedConversation ? (
+                        <DirectMessageChatArea
+                            conversationId={selectedConversation.conversationId}
+                            friendId={selectedConversation.friendId}
+                            friendName={selectedConversation.friendName}
+                            onBack={() => setSelectedConversation(null)}
                         />
-                    </View>
+                    ) : (
+                        <DirectMessageList
+                            onSelectConversation={(conversationId, friendId, friendName) => {
+                                setSelectedConversation({ conversationId, friendId, friendName });
+                            }}
+                        />
+                    )}
                 </View>
             ) : (
                 <View className="flex-1 flex-row">
