@@ -1,8 +1,10 @@
 import { InputModal } from '@/src/components/InputModal';
 import { InviteModal } from '@/src/components/InviteModal';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, SectionList, Text, TouchableOpacity, View } from 'react-native';
 import { ActivityIndicator, IconButton, Portal } from 'react-native-paper';
+import { useSelector } from 'react-redux';
 import { ChannelResponse, serverApi, ServerResponse } from '../api/serverApi';
 import { COLORS } from '../constants/colors';
 
@@ -19,7 +21,7 @@ interface SectionData {
 }
 
 // Custom Menu Modal Component
-const ServerMenuModal = ({ visible, onDismiss, serverName, onOptionSelect }: any) => {
+const ServerMenuModal = ({ visible, onDismiss, serverName, onOptionSelect, isOwner }: any) => {
     return (
         <Portal>
             <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
@@ -49,6 +51,17 @@ const ServerMenuModal = ({ visible, onDismiss, serverName, onOptionSelect }: any
                             label="Mời bạn bè"
                             onPress={() => onOptionSelect('invite')}
                         />
+                        {isOwner && (
+                            <>
+                                <View className="h-[1px] bg-[#3F4147] my-2" />
+                                <MenuOption
+                                    icon="delete"
+                                    label="Xóa Server"
+                                    onPress={() => onOptionSelect('delete_server')}
+                                    color={COLORS.danger}
+                                />
+                            </>
+                        )}
                     </View>
                 </TouchableOpacity>
             </Modal>
@@ -56,17 +69,19 @@ const ServerMenuModal = ({ visible, onDismiss, serverName, onOptionSelect }: any
     );
 };
 
-const MenuOption = ({ icon, label, onPress }: any) => (
+const MenuOption = ({ icon, label, onPress, color }: any) => (
     <TouchableOpacity
         className="flex-row items-center p-3 rounded-[4px] active:bg-[#3F4147] mb-1"
         onPress={onPress}
     >
-        <IconButton icon={icon} size={24} iconColor="#B5BAC1" style={{ margin: 0, marginRight: 12 }} />
-        <Text className="text-[#B5BAC1] font-bold text-base">{label}</Text>
+        <IconButton icon={icon} size={24} iconColor={color || "#B5BAC1"} style={{ margin: 0, marginRight: 12 }} />
+        <Text className="font-bold text-base" style={{ color: color || "#B5BAC1" }}>{label}</Text>
     </TouchableOpacity>
 );
 
 export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: ServerChannelListProps) => {
+    const router = useRouter();
+    const user = useSelector((state: any) => state.auth.user);
     const [loading, setLoading] = useState(true);
     const [sections, setSections] = useState<SectionData[]>([]);
     const [serverDetails, setServerDetails] = useState<ServerResponse | null>(null);
@@ -128,6 +143,71 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
             Alert.alert("Lỗi", "Không thể tạo danh mục");
         }
     };
+    const handleDeleteServer = () => {
+        Alert.alert(
+            "Xóa Server",
+            `Bạn có chắc chắn muốn xóa server "${serverDetails?.name || serverName}"? Hành động này không thể hoàn tác.`,
+            [
+                { text: "Hủy", style: "cancel" },
+                {
+                    text: "Xóa",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await serverApi.deleteServer(serverId);
+                            router.replace('/(tabs)');
+                        } catch (error) {
+                            Alert.alert("Lỗi", "Không thể xóa server");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleDeleteCategory = (categoryId: number, categoryName: string) => {
+        Alert.alert(
+            "Xóa Danh Mục",
+            `Bạn có chắc chắn muốn xóa danh mục "${categoryName}"?`,
+            [
+                { text: "Hủy", style: "cancel" },
+                {
+                    text: "Xóa",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await serverApi.deleteCategory(categoryId);
+                            fetchData();
+                        } catch (error) {
+                            Alert.alert("Lỗi", "Không thể xóa danh mục");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleDeleteChannel = (channelId: number, channelName: string) => {
+        Alert.alert(
+            "Xóa Kênh",
+            `Bạn có chắc chắn muốn xóa kênh "${channelName}"?`,
+            [
+                { text: "Hủy", style: "cancel" },
+                {
+                    text: "Xóa",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await serverApi.deleteChannel(channelId);
+                            fetchData();
+                        } catch (error) {
+                            Alert.alert("Lỗi", "Không thể xóa kênh");
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     const openCreateChannelModal = (categoryId?: number, categoryName?: string) => {
         setCurrentCategoryId(categoryId);
@@ -148,6 +228,9 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
                 case 'invite':
                     setInviteModalVisible(true);
                     break;
+                case 'delete_server':
+                    handleDeleteServer();
+                    break;
             }
         }, 300);
     }
@@ -156,6 +239,8 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
         <TouchableOpacity
             className="flex-row items-center px-2 py-1.5 mx-2 rounded-md active:bg-discord-hover/20 mb-0.5 group"
             onPress={() => onChannelSelect?.(item.id, item.name)}
+            onLongPress={() => handleDeleteChannel(item.id, item.name)}
+            delayLongPress={500}
         >
             <IconButton
                 icon={item.type === 'VOICE' ? 'volume-high' : 'pound'}
@@ -170,7 +255,11 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
     const renderHeader = ({ section }: { section: SectionData }) => (
         section.title ? (
             <View className="flex-row items-center px-4 pt-4 pb-1 justify-between group">
-                <TouchableOpacity className="flex-row items-center flex-1">
+                <TouchableOpacity
+                    className="flex-row items-center flex-1"
+                    onLongPress={() => section.categoryId && handleDeleteCategory(section.categoryId, section.title)}
+                    delayLongPress={500}
+                >
                     <IconButton icon="chevron-down" size={12} iconColor="#949BA4" style={{ margin: 0, marginRight: 2 }} />
                     <Text className="text-discord-text-muted text-xs font-bold uppercase">{section.title}</Text>
                 </TouchableOpacity>
@@ -220,6 +309,7 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
                 onDismiss={() => setMenuVisible(false)}
                 serverName={serverDetails?.name || serverName}
                 onOptionSelect={handleMenuSelection}
+                isOwner={user?.id === serverDetails?.ownerId}
             />
 
             {/* Modals */}

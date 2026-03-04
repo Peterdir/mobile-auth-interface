@@ -23,6 +23,16 @@ export interface CategoryResponse {
     channels?: ChannelResponse[];
 }
 
+export interface ServerMember {
+    id: number;
+    userId: number;
+    userName: string;
+    displayName: string;
+    nickname?: string;
+    role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    joinedAt: string;
+}
+
 export interface ChannelResponse {
     id: number;
     name: string;
@@ -43,6 +53,9 @@ export const serverApi = {
     getDetails: (serverId: number | string) =>
         apiClient.get<ServerResponse>(`/servers/${serverId}/details`),
 
+    getServerMembers: (serverId: number | string) =>
+        apiClient.get<ServerMember[]>(`/servers/${serverId}/members`),
+
     join: (inviteCode: string) =>
         apiClient.post<ServerResponse>('/servers/join', { inviteCode }),
 
@@ -59,4 +72,14 @@ export const serverApi = {
 
     createChannel: (serverId: number | string, name: string, type: 'TEXT' | 'VOICE', categoryId?: number) =>
         apiClient.post<ChannelResponse>(`/servers/${serverId}/channels`, { name, type, categoryId, serverId }),
+
+    // DELETE OPERATIONS
+    deleteServer: (serverId: number | string) =>
+        apiClient.delete<{ message: string }>(`/servers/${serverId}`),
+
+    deleteCategory: (categoryId: number | string) =>
+        apiClient.delete<{ message: string }>(`/categories/${categoryId}`),
+
+    deleteChannel: (channelId: number | string) =>
+        apiClient.delete<{ message: string }>(`/channels/${channelId}`),
 };

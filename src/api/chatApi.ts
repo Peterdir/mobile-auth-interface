@@ -1,13 +1,12 @@
 import { apiClient } from "./apiClient";
 
 export interface ChatMessage {
-    id: number;
+    id: string;
     content: string;
     senderId: number;
     senderName: string;
     senderAvatar?: string;
-    channelId: number;
-    createdAt: string;
+    createdAt: string | number[]; // LocalDateTime string or array from backend
 }
 
 export const chatApi = {
@@ -19,5 +18,11 @@ export const chatApi = {
             console.error("Error fetching messages:", error);
             throw error;
         }
+    },
+    deleteMessage: async (messageId: string) => {
+        return await apiClient.delete(`/messages/${messageId}`);
+    },
+    editMessage: async (messageId: string, content: string) => {
+        return await apiClient.put<ChatMessage>(`/messages/${messageId}`, { content });
     }
 };

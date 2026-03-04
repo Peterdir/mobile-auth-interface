@@ -1,0 +1,5 @@
+hooks/use-theme-color.ts(6,24): error TS2307: Cannot find module '@/constants/theme' or its corresponding type declarations.
+hooks/use-theme-color.ts(7,32): error TS2307: Cannot find module '@/hooks/use-color-scheme' or its corresponding type declarations.
+hooks/use-theme-color.ts(14,26): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ light?: string | undefined; dark?: string | undefined; }'.
+src/components/ui/collapsible.tsx(4,28): error TS2307: Cannot find module '@/src/components/themed-text' or its corresponding type declarations.
+src/components/ui/collapsible.tsx(5,28): error TS2307: Cannot find module '@/src/components/themed-view' or its corresponding type declarations.
