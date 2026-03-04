@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   Image,
+  Modal as RNModal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -58,6 +59,10 @@ export default function ProfileScreen() {
   // Animations
   const shimmerValue = useRef(new Animated.Value(0)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
+  const pulseValue = useRef(new Animated.Value(1)).current;
+
+  // Store Modal State
+  const [storeModalVisible, setStoreModalVisible] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -78,6 +83,23 @@ export default function ProfileScreen() {
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseValue, {
+          toValue: 1.05,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseValue, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
   }, []);
 
@@ -205,6 +227,7 @@ export default function ProfileScreen() {
                 { overflow: "hidden" },
               ]}
               activeOpacity={0.8}
+              onPress={() => setStoreModalVisible(true)}
             >
               {/* Shimmer Effect */}
               <Animated.View
@@ -353,6 +376,7 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     style={[styles.promoBtn, { overflow: "hidden" }]}
                     activeOpacity={0.8}
+                    onPress={() => setStoreModalVisible(true)}
                   >
                     {/* Shimmer Effect */}
                     <Animated.View
@@ -531,6 +555,427 @@ export default function ProfileScreen() {
             </Modal>
           </Portal>
         </ScrollView>
+
+        {/* Nitro Store Modal */}
+        <RNModal
+          visible={storeModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setStoreModalVisible(false)}
+        >
+          <SafeAreaView style={styles.storeContainer} edges={["top", "bottom"]}>
+            {/* Store Header */}
+            <View style={styles.storeHeader}>
+              <TouchableOpacity
+                onPress={() => setStoreModalVisible(false)}
+                style={styles.storeCloseBtn}
+              >
+                <IconButton
+                  icon="arrow-left"
+                  size={24}
+                  iconColor="#FFFFFF"
+                  style={{ margin: 0 }}
+                />
+              </TouchableOpacity>
+              <View style={styles.storeHeaderTitleWrapper}>
+                <IconButton
+                  icon="discord"
+                  size={20}
+                  iconColor="#FFFFFF"
+                  style={{ margin: 0, marginRight: 4 }}
+                />
+                <Text style={styles.storeHeaderDiscord}>Discord</Text>
+              </View>
+              <Text style={styles.storeHeaderNitro}>NITRO</Text>
+            </View>
+
+            <ScrollView
+              style={styles.storeScrollView}
+              contentContainerStyle={styles.storeScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.storeSubtitle}>
+                Khám phá nhiều niềm vui hơn trên Discord
+              </Text>
+
+              {/* Nitro Standard Card */}
+              <View style={styles.storeCardStandard}>
+                <View style={styles.storeCardHeader}>
+                  <Text style={styles.storeCardTitleStandard}>NITRO</Text>
+                  <Text style={styles.storeCardPrice}>
+                    113.000 ₫{" "}
+                    <Text style={styles.storeCardPriceUnit}>/ tháng</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.storeFeatureList}>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="upload"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>Tải lên 500MB</Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="emoticon-happy-outline"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Emoji tùy chọn tại bất cứ đâu
+                    </Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="star-face"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Biểu Cảm Siêu Cấp Không Giới Hạn
+                    </Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="monitor-share"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Đang stream video HD
+                    </Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="rocket-launch"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      2 Nâng Cấp Máy Chủ
+                    </Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="account-details"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Hồ sơ tùy chỉnh và hơn thế nữa!
+                    </Text>
+                  </View>
+                </View>
+
+                <Animated.View style={{ transform: [{ scale: pulseValue }] }}>
+                  <TouchableOpacity
+                    style={styles.storeCardButton}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.storeCardButtonTextStandard}>
+                      Lấy Nitro
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                <Image
+                  source={require("../../assets/images/nitro_standard.png")}
+                  style={styles.storeMascotStandard}
+                />
+              </View>
+
+              {/* Nitro Basic Card */}
+              <View style={styles.storeCardBasic}>
+                <View style={styles.storeCardHeader}>
+                  <Text style={styles.storeCardTitleBasic}>NITRO BASIC</Text>
+                  <Text style={styles.storeCardPrice}>
+                    42.000 ₫{" "}
+                    <Text style={styles.storeCardPriceUnit}>/ tháng</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.storeFeatureList}>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="upload"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>Tải lên 50MB</Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="emoticon-happy-outline"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Emoji tùy chọn tại bất cứ đâu
+                    </Text>
+                  </View>
+                  <View style={styles.storeFeatureItem}>
+                    <IconButton
+                      icon="shield-star"
+                      size={16}
+                      iconColor="#E5E5E5"
+                      style={{ margin: 0, marginRight: 8 }}
+                    />
+                    <Text style={styles.storeFeatureText}>
+                      Huy hiệu Nitro đặc biệt trên trang cá nhân của bạn
+                    </Text>
+                  </View>
+                </View>
+
+                <Animated.View style={{ transform: [{ scale: pulseValue }] }}>
+                  <TouchableOpacity
+                    style={styles.storeCardButton}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.storeCardButtonTextBasic}>
+                      Tải Basic
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                <Image
+                  source={require("../../assets/images/nitro_basic.png")}
+                  style={styles.storeMascotBasic}
+                />
+              </View>
+
+              {/* Comparison Table */}
+              <View style={styles.storeTableContainer}>
+                <Text style={styles.storeTableTitle}>
+                  Các đặc quyền Nitro yêu thích
+                </Text>
+                <View style={styles.storeTableTitleRow}>
+                  <Text style={styles.storeTableTitleLeft}>
+                    Chọn gói đăng ký của bạn
+                  </Text>
+                </View>
+
+                {/* Table Headers */}
+                <View style={styles.storeTableRow}>
+                  <View style={styles.storeTableColEmpty}></View>
+                  <View style={styles.storeTableColBasic}>
+                    <Text style={styles.storeTableColHeaderBasic}>BASIC</Text>
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <Text style={styles.storeTableColHeaderStandard}>
+                      NITRO
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Table Row 1 */}
+                <View style={[styles.storeTableRow, styles.storeTableRowBg]}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Giá hàng tháng
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <Text style={styles.storeTableValueText}>42.000 ₫</Text>
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <Text style={styles.storeTableValueText}>113.000 ₫</Text>
+                  </View>
+                </View>
+
+                {/* Table Row 2 */}
+                <View style={styles.storeTableRow}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Emoji và sticker tùy chỉnh ở mọi nơi
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+
+                {/* Table Row 3 */}
+                <View style={[styles.storeTableRow, styles.storeTableRowBg]}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Tải lên Tệp tin Dung lượng Lớn
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <Text style={styles.storeTableValueText}>50 MB</Text>
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <Text style={styles.storeTableValueText}>500 MB</Text>
+                  </View>
+                </View>
+
+                {/* Table Row 4 */}
+                <View style={styles.storeTableRow}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Huy hiệu hồ sơ Nitro
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+
+                {/* Table Row 5 */}
+                <View style={[styles.storeTableRow, styles.storeTableRowBg]}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      2 Nâng Cấp Máy Chủ
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="close"
+                      size={20}
+                      iconColor="#4E5058"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+
+                {/* Table Row 6 */}
+                <View style={styles.storeTableRow}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Ảnh đại diện hoạt hình, và tùy chỉnh hồ sơ
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="close"
+                      size={20}
+                      iconColor="#4E5058"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+
+                {/* Table Row 7 */}
+                <View style={[styles.storeTableRow, styles.storeTableRowBg]}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Đang stream video HD
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="close"
+                      size={20}
+                      iconColor="#4E5058"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+
+                {/* Table Row 8 */}
+                <View style={styles.storeTableRow}>
+                  <View style={styles.storeTableColFeature}>
+                    <Text style={styles.storeTableFeatureText}>
+                      Và thêm các mục khác nữa!
+                    </Text>
+                  </View>
+                  <View style={styles.storeTableColBasic}>
+                    <IconButton
+                      icon="close"
+                      size={20}
+                      iconColor="#4E5058"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                  <View style={styles.storeTableColStandard}>
+                    <IconButton
+                      icon="check"
+                      size={20}
+                      iconColor="#DCDDDE"
+                      style={{ margin: 0, padding: 0, height: 20 }}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.storeFooter}>
+                <Text style={styles.storeFooterText}>
+                  Giải phóng niềm vui cùng Nitro!
+                </Text>
+                <Animated.View
+                  style={{ width: "100%", transform: [{ scale: pulseValue }] }}
+                >
+                  <TouchableOpacity
+                    style={styles.storeFooterButton}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.storeFooterButtonText}>Lấy Nitro</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </RNModal>
       </PaperProvider>
     </SafeAreaView>
   );
@@ -968,5 +1413,254 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: DISCORD.white,
     fontWeight: "600",
+  },
+
+  // --- NITRO STORE MODAL STYLES ---
+  storeContainer: {
+    flex: 1,
+    backgroundColor: "#111214",
+  },
+  storeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    height: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1F22",
+  },
+  storeCloseBtn: {
+    marginRight: 16,
+  },
+  storeHeaderTitleWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  storeHeaderDiscord: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "800",
+    fontStyle: "italic",
+    marginRight: 6,
+  },
+  storeHeaderNitro: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    fontStyle: "italic",
+  },
+  storeScrollView: {
+    flex: 1,
+  },
+  storeScrollContent: {
+    paddingTop: 24,
+    paddingBottom: 40,
+    paddingHorizontal: 16,
+  },
+  storeSubtitle: {
+    color: "#B5BAC1",
+    fontSize: 16,
+    textAlign: "center",
+    fontWeight: "500",
+    marginBottom: 24,
+  },
+
+  // Cards
+  storeCardStandard: {
+    backgroundColor: "#8d4ff0", // Base fallback
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#b983ff",
+  },
+  storeCardBasic: {
+    backgroundColor: "#0F51E3", // Base fallback
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    overflow: "hidden",
+  },
+  storeCardHeader: {
+    marginBottom: 16,
+  },
+  storeCardTitleStandard: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "900",
+    fontStyle: "italic",
+    marginBottom: 4,
+  },
+  storeCardTitleBasic: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "900",
+    fontStyle: "italic",
+    marginBottom: 4,
+  },
+  storeCardPrice: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  storeCardPriceUnit: {
+    fontSize: 14,
+    fontWeight: "500",
+    opacity: 0.8,
+  },
+  storeFeatureList: {
+    marginBottom: 24,
+    zIndex: 2,
+  },
+  storeFeatureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingRight: 80, // Leave space for mascot
+  },
+  storeFeatureText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+    flexWrap: "wrap",
+  },
+  storeCardButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: "center",
+    zIndex: 2,
+  },
+  storeCardButtonTextStandard: {
+    color: "#8d4ff0",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  storeCardButtonTextBasic: {
+    color: "#0F51E3",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // Mascots
+  storeMascotStandard: {
+    position: "absolute",
+    top: 20,
+    right: -10,
+    width: 140,
+    height: 140,
+    resizeMode: "contain",
+    zIndex: 1,
+    opacity: 0.9,
+  },
+  storeMascotBasic: {
+    position: "absolute",
+    top: 20,
+    right: -10,
+    width: 130,
+    height: 130,
+    resizeMode: "contain",
+    zIndex: 1,
+    opacity: 0.9,
+  },
+
+  // Table
+  storeTableContainer: {
+    marginTop: 16,
+  },
+  storeTableTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  storeTableTitleRow: {
+    flexDirection: "row",
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2B2D31",
+    paddingBottom: 8,
+  },
+  storeTableTitleLeft: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    flex: 1,
+  },
+  storeTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  storeTableRowBg: {
+    backgroundColor: "#1E1F22",
+  },
+  storeTableColEmpty: {
+    flex: 2,
+  },
+  storeTableColFeature: {
+    flex: 2,
+    paddingRight: 8,
+  },
+  storeTableFeatureText: {
+    color: "#DCDDDE",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  storeTableColBasic: {
+    flex: 1,
+    alignItems: "center",
+  },
+  storeTableColHeaderBasic: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+    fontStyle: "italic",
+  },
+  storeTableColStandard: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: "#313338",
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  storeTableColHeaderStandard: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800",
+    fontStyle: "italic",
+  },
+  storeTableValueText: {
+    color: "#B5BAC1",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+
+  // Footer
+  storeFooter: {
+    marginTop: 40,
+    alignItems: "center",
+  },
+  storeFooterText: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 16,
+  },
+  storeFooterButton: {
+    backgroundColor: "#5865F2",
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    width: "100%",
+    alignItems: "center",
+  },
+  storeFooterButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
