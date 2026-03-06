@@ -1,5 +1,6 @@
 import { InputModal } from '@/src/components/InputModal';
 import { InviteModal } from '@/src/components/InviteModal';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, SectionList, Text, TouchableOpacity, View } from 'react-native';
@@ -12,6 +13,11 @@ interface ServerChannelListProps {
     serverId: string | number;
     serverName: string;
     onChannelSelect?: (channelId: number, channelName: string, channelType: string) => void;
+    activeVoiceChannelId?: number;
+    voiceCallSeconds?: number;
+    isMicMuted?: boolean;
+    isCameraOff?: boolean;
+    username?: string;
 }
 
 interface SectionData {
@@ -79,7 +85,16 @@ const MenuOption = ({ icon, label, onPress, color }: any) => (
     </TouchableOpacity>
 );
 
-export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: ServerChannelListProps) => {
+export const ServerChannelList = ({
+    serverId,
+    serverName,
+    onChannelSelect,
+    activeVoiceChannelId,
+    voiceCallSeconds = 0,
+    isMicMuted = false,
+    isCameraOff = true,
+    username = 'Duy'
+}: ServerChannelListProps) => {
     const router = useRouter();
     const user = useSelector((state: any) => state.auth.user);
     const [loading, setLoading] = useState(true);
@@ -235,22 +250,68 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
         }, 300);
     }
 
-    const renderChannel = ({ item }: { item: ChannelResponse }) => (
-        <TouchableOpacity
-            className="flex-row items-center px-2 py-1.5 mx-2 rounded-md active:bg-discord-hover/20 mb-0.5 group"
-            onPress={() => onChannelSelect?.(item.id, item.name, item.type)}
-            onLongPress={() => handleDeleteChannel(item.id, item.name)}
-            delayLongPress={500}
-        >
-            <IconButton
-                icon={item.type === 'VOICE' ? 'volume-high' : 'pound'}
-                size={20}
-                iconColor="#949BA4"
-                style={{ margin: 0, marginRight: 4 }}
-            />
-            <Text className={`font-medium flex-1 text-[#949BA4] group-active:text-white`}>{item.name}</Text>
-        </TouchableOpacity>
-    );
+    const formatTime = (totalSeconds: number) => {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const renderChannel = ({ item }: { item: ChannelResponse }) => {
+        const isActiveVoice = item.id === activeVoiceChannelId && item.type === 'VOICE';
+
+        return (
+            <View>
+                <TouchableOpacity
+                    className="flex-row items-center px-2 py-1.5 mx-2 rounded-md active:bg-discord-hover/20 mb-0.5 group"
+                    onPress={() => onChannelSelect?.(item.id, item.name, item.type)}
+                    onLongPress={() => handleDeleteChannel(item.id, item.name)}
+                    delayLongPress={500}
+                >
+                    <IconButton
+                        icon={item.type === 'VOICE' ? 'volume-high' : 'pound'}
+                        size={20}
+                        iconColor={isActiveVoice ? "#23A559" : "#949BA4"}
+                        style={{ margin: 0, marginRight: 4 }}
+                    />
+                    <Text
+                        className={`font-medium flex-1 ${isActiveVoice ? 'text-[#23A559]' : 'text-[#949BA4]'} group-active:text-white`}
+                        numberOfLines={1}
+                    >
+                        {item.name}
+                    </Text>
+                    {isActiveVoice && voiceCallSeconds > 0 && (
+                        <Text className="text-[#23A559] font-bold text-xs mr-1">
+                            {formatTime(voiceCallSeconds)}
+                        </Text>
+                    )}
+                </TouchableOpacity>
+
+                {/* Participant Sub-row (Matches Image: Avatar, Name, Status icons) */}
+                {isActiveVoice && (
+                    <View className="flex-row items-center ml-10 py-1 mb-1">
+                        <View className="w-6 h-6 bg-[#5865F2] rounded-full items-center justify-center mr-2">
+                            <Ionicons name="logo-discord" size={16} color="white" />
+                        </View>
+                        <Text className={`font-semibold flex-1 ${isActiveVoice ? 'text-white' : 'text-[#949BA4]'} text-sm`}>
+                            {username}
+                        </Text>
+
+                        <View className="flex-row items-center mr-2 gap-2">
+                            {isMicMuted && (
+                                <Ionicons name="mic-off" size={14} color="#949BA4" />
+                            )}
+                            {isCameraOff ? (
+                                <Ionicons name="videocam-off" size={14} color="#949BA4" />
+                            ) : (
+                                <Ionicons name="videocam" size={14} color="#23A559" />
+                            )}
+                            <MaterialCommunityIcons name="gamepad-variant" size={16} color="#E51584" />
+                        </View>
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     const renderHeader = ({ section }: { section: SectionData }) => (
         section.title ? (

@@ -4,10 +4,13 @@ import { ChatArea } from "@/src/components/ChatArea";
 import { DirectMessageChatArea } from "@/src/components/DirectMessageChatArea";
 import { DirectMessageList } from "@/src/components/DirectMessageList";
 import { InputModal } from "@/src/components/InputModal";
+import { InviteFriendsModal } from "@/src/components/InviteFriendsModal";
 import { JoinServerModal } from "@/src/components/JoinServerModal";
 import { ServerChannelList } from "@/src/components/ServerChannelList";
 import { VoiceChannelArea } from "@/src/components/VoiceChannelArea";
+import { VoiceChannelChat } from "@/src/components/VoiceChannelChat";
 import { VoiceChannelPreview } from "@/src/components/VoiceChannelPreview";
+import { VoicePIPOverlay } from "@/src/components/VoicePIPOverlay";
 import { logout } from "@/src/store/slices/authSlice";
 import { storage } from "@/src/utils/storage";
 import { useNavigation, useRouter } from "expo-router";
@@ -48,7 +51,7 @@ export default function HomeScreen() {
   const [selectedChannel, setSelectedChannel] = useState<{
     id: number;
     name: string;
-    type?: string;
+    type: string;
   } | null>(null);
 
   // Voice Preview State
@@ -56,6 +59,7 @@ export default function HomeScreen() {
   const [previewChannelData, setPreviewChannelData] = useState<{
     id: number;
     name: string;
+    type: string;
   } | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<{
     conversationId: string;
@@ -63,6 +67,34 @@ export default function HomeScreen() {
     friendName: string;
   } | null>(null);
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
+  const [showStandaloneVoiceChat, setShowStandaloneVoiceChat] = useState(false);
+  const [isInviteFromPreviewVisible, setIsInviteFromPreviewVisible] = useState(false);
+  const [isVoiceMinimized, setIsVoiceMinimized] = useState(false);
+  const [activeVoiceChannel, setActiveVoiceChannel] = useState<{
+    id: number;
+    name: string;
+    type: string;
+  } | null>(null);
+  const [isMicMuted, setIsMicMuted] = useState(true);
+  const [isCameraOff, setIsCameraOff] = useState(true);
+  const [voiceCallSeconds, setVoiceCallSeconds] = useState(0);
+
+  // Global Voice Call Timer
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (activeVoiceChannel) {
+      interval = setInterval(() => {
+        setVoiceCallSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setVoiceCallSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeVoiceChannel]);
+
+  const currentUser = useSelector((state: any) => state.auth.user);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -464,27 +496,45 @@ export default function HomeScreen() {
               serverName={
                 servers.find((s) => s.id === selectedServerId)?.name || "Server"
               }
+              activeVoiceChannelId={activeVoiceChannel?.id}
+              voiceCallSeconds={voiceCallSeconds}
+              isMicMuted={isMicMuted}
+              isCameraOff={isCameraOff}
+              username={user?.userName || "Duy"}
               onChannelSelect={(id, name, type) => {
-                if (type === 'VOICE') {
-                  setPreviewChannelData({ id, name });
+                if (type.toUpperCase() === "VOICE") {
+                  setPreviewChannelData({ id, name, type: type.toUpperCase() });
                   setShowVoicePreview(true);
                 } else {
-                  setSelectedChannel({ id, name, type });
+                  setSelectedChannel({ id, name, type: type.toUpperCase() });
                   setIsChatFullscreen(true);
                 }
               }}
             />
           )}
 
-          {/* Chat/Voice Area - Visible only when in channel */}
+          {/* Chat/Voice Area - Visible only when in channel and not minimized voice */}
           {isChatFullscreen && selectedChannel && (
             <View className="flex-1 bg-discord-background">
-              {selectedChannel.type === 'VOICE' ? (
+              {selectedChannel.type.toUpperCase() === 'VOICE' ? (
                 <VoiceChannelArea
                   channelId={selectedChannel.id}
                   channelName={selectedChannel.name}
                   serverId={Number(selectedServerId)}
-                  onBack={() => setIsChatFullscreen(false)}
+                  isMicMuted={isMicMuted}
+                  setIsMicMuted={setIsMicMuted}
+                  isCameraOff={isCameraOff}
+                  setIsCameraOff={setIsCameraOff}
+                  voiceCallSeconds={voiceCallSeconds}
+                  onBack={() => {
+                    setIsChatFullscreen(false);
+                    setActiveVoiceChannel(null);
+                    setIsVoiceMinimized(false);
+                  }}
+                  onMinimize={() => {
+                    setIsChatFullscreen(false);
+                    setIsVoiceMinimized(true);
+                  }}
                 />
               ) : (
                 <ChatArea
@@ -496,6 +546,19 @@ export default function HomeScreen() {
               )}
             </View>
           )}
+
+          <VoicePIPOverlay
+            visible={activeVoiceChannel !== null && (!isChatFullscreen || (selectedChannel?.id !== activeVoiceChannel.id))}
+            avatarUrl={currentUser?.avatarUrl}
+            username={user?.userName || "Duy"}
+            isMicMuted={isMicMuted}
+            isCameraOff={isCameraOff}
+            onPress={() => {
+              setSelectedChannel(activeVoiceChannel);
+              setIsChatFullscreen(true);
+              setIsVoiceMinimized(false);
+            }}
+          />
         </View>
       )}
 
@@ -520,11 +583,32 @@ export default function HomeScreen() {
         channelName={previewChannelData?.name || ""}
         onJoin={() => {
           if (previewChannelData) {
-            setSelectedChannel({ ...previewChannelData, type: 'VOICE' });
             setShowVoicePreview(false);
+            setSelectedChannel(previewChannelData);
+            setActiveVoiceChannel(previewChannelData);
             setIsChatFullscreen(true);
+            setIsVoiceMinimized(false);
           }
         }}
+        onChat={() => {
+          if (previewChannelData) {
+            setShowVoicePreview(false);
+            setShowStandaloneVoiceChat(true);
+          }
+        }}
+        onInvite={() => setIsInviteFromPreviewVisible(true)}
+      />
+
+      <VoiceChannelChat
+        visible={showStandaloneVoiceChat}
+        onClose={() => setShowStandaloneVoiceChat(false)}
+        channelName={previewChannelData?.name || ""}
+      />
+
+      <InviteFriendsModal
+        visible={isInviteFromPreviewVisible}
+        onClose={() => setIsInviteFromPreviewVisible(false)}
+        serverName="Code lò"
       />
     </SafeAreaView>
   );
