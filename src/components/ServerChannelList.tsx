@@ -11,7 +11,7 @@ import { COLORS } from '../constants/colors';
 interface ServerChannelListProps {
     serverId: string | number;
     serverName: string;
-    onChannelSelect?: (channelId: number, channelName: string) => void;
+    onChannelSelect?: (channelId: number, channelName: string, channelType: string) => void;
 }
 
 interface SectionData {
@@ -238,7 +238,7 @@ export const ServerChannelList = ({ serverId, serverName, onChannelSelect }: Ser
     const renderChannel = ({ item }: { item: ChannelResponse }) => (
         <TouchableOpacity
             className="flex-row items-center px-2 py-1.5 mx-2 rounded-md active:bg-discord-hover/20 mb-0.5 group"
-            onPress={() => onChannelSelect?.(item.id, item.name)}
+            onPress={() => onChannelSelect?.(item.id, item.name, item.type)}
             onLongPress={() => handleDeleteChannel(item.id, item.name)}
             delayLongPress={500}
         >

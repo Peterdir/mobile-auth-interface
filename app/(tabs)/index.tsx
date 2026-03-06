@@ -6,6 +6,8 @@ import { DirectMessageList } from "@/src/components/DirectMessageList";
 import { InputModal } from "@/src/components/InputModal";
 import { JoinServerModal } from "@/src/components/JoinServerModal";
 import { ServerChannelList } from "@/src/components/ServerChannelList";
+import { VoiceChannelArea } from "@/src/components/VoiceChannelArea";
+import { VoiceChannelPreview } from "@/src/components/VoiceChannelPreview";
 import { logout } from "@/src/store/slices/authSlice";
 import { storage } from "@/src/utils/storage";
 import { useNavigation, useRouter } from "expo-router";
@@ -46,6 +48,14 @@ export default function HomeScreen() {
   const [selectedChannel, setSelectedChannel] = useState<{
     id: number;
     name: string;
+    type?: string;
+  } | null>(null);
+
+  // Voice Preview State
+  const [showVoicePreview, setShowVoicePreview] = useState(false);
+  const [previewChannelData, setPreviewChannelData] = useState<{
+    id: number;
+    name: string;
   } | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<{
     conversationId: string;
@@ -67,16 +77,16 @@ export default function HomeScreen() {
         isChatFullscreen || !!selectedConversation
           ? { display: "none" }
           : Platform.select({
-              ios: {
-                position: "absolute",
-                backgroundColor: "#1E1F22",
-                borderTopColor: "#2B2D31",
-              },
-              default: {
-                backgroundColor: "#1E1F22",
-                borderTopColor: "#2B2D31",
-              },
-            }),
+            ios: {
+              position: "absolute",
+              backgroundColor: "#1E1F22",
+              borderTopColor: "#2B2D31",
+            },
+            default: {
+              backgroundColor: "#1E1F22",
+              borderTopColor: "#2B2D31",
+            },
+          }),
     });
   }, [isChatFullscreen, selectedConversation, navigation]);
 
@@ -340,8 +350,8 @@ export default function HomeScreen() {
             <Text className="text-discord-text-muted text-xs">
               {item.lastMessage
                 ? new Date(item.lastMessage.timestamp).getDate() +
-                  " thg " +
-                  (new Date(item.lastMessage.timestamp).getMonth() + 1)
+                " thg " +
+                (new Date(item.lastMessage.timestamp).getMonth() + 1)
                 : ""}
             </Text>
           </View>
@@ -454,22 +464,36 @@ export default function HomeScreen() {
               serverName={
                 servers.find((s) => s.id === selectedServerId)?.name || "Server"
               }
-              onChannelSelect={(id, name) => {
-                setSelectedChannel({ id, name });
-                setIsChatFullscreen(true);
+              onChannelSelect={(id, name, type) => {
+                if (type === 'VOICE') {
+                  setPreviewChannelData({ id, name });
+                  setShowVoicePreview(true);
+                } else {
+                  setSelectedChannel({ id, name, type });
+                  setIsChatFullscreen(true);
+                }
               }}
             />
           )}
 
-          {/* Chat Area - Visible only when in chat */}
+          {/* Chat/Voice Area - Visible only when in channel */}
           {isChatFullscreen && selectedChannel && (
             <View className="flex-1 bg-discord-background">
-              <ChatArea
-                channelId={selectedChannel.id}
-                channelName={selectedChannel.name}
-                serverId={Number(selectedServerId)}
-                onBack={() => setIsChatFullscreen(false)}
-              />
+              {selectedChannel.type === 'VOICE' ? (
+                <VoiceChannelArea
+                  channelId={selectedChannel.id}
+                  channelName={selectedChannel.name}
+                  serverId={Number(selectedServerId)}
+                  onBack={() => setIsChatFullscreen(false)}
+                />
+              ) : (
+                <ChatArea
+                  channelId={selectedChannel.id}
+                  channelName={selectedChannel.name}
+                  serverId={Number(selectedServerId)}
+                  onBack={() => setIsChatFullscreen(false)}
+                />
+              )}
             </View>
           )}
         </View>
@@ -488,6 +512,19 @@ export default function HomeScreen() {
         visible={joinModalVisible}
         onDismiss={() => setJoinModalVisible(false)}
         onJoinSuccess={handleJoinSuccess}
+      />
+
+      <VoiceChannelPreview
+        visible={showVoicePreview}
+        onClose={() => setShowVoicePreview(false)}
+        channelName={previewChannelData?.name || ""}
+        onJoin={() => {
+          if (previewChannelData) {
+            setSelectedChannel({ ...previewChannelData, type: 'VOICE' });
+            setShowVoicePreview(false);
+            setIsChatFullscreen(true);
+          }
+        }}
       />
     </SafeAreaView>
   );

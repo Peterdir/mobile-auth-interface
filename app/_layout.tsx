@@ -87,12 +87,9 @@ function AppContent() {
   return (
     <View style={{ flex: 1, backgroundColor: '#313338' }} onLayout={onLayoutRootView}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#313338' } }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" />
-        <Stack.Screen name="(auth)/register" />
-        <Stack.Screen name="(auth)/otp-verify" />
-        <Stack.Screen name="(auth)/forget-password" />
-        <Stack.Screen name="(auth)/reset-password" />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
     </View>
   );
