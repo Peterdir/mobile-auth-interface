@@ -58,7 +58,7 @@ export const ServerMemberList = ({ visible, onClose, serverId }: ServerMemberLis
                 </View>
                 <View style={styles.memberInfo}>
                     <Text style={[styles.memberName, { color: item.role === 'OWNER' ? '#F04747' : item.role === 'ADMIN' ? '#FAA61A' : '#FFFFFF' }]}>
-                        {item.displayName || item.userName}
+                        {item.displayName || item.username}
                     </Text>
                     <Text style={styles.memberStatus}>{item.role}</Text>
                 </View>

@@ -2,6 +2,7 @@ import {
   directMessageApi,
   DirectMessageResponse,
 } from "@/src/api/directMessageApi";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Client } from "@stomp/stompjs";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -9,12 +10,14 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { ActivityIndicator, IconButton, Text } from "react-native-paper";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { WS_URL } from "../api/config";
 
@@ -25,16 +28,22 @@ interface DirectMessageChatAreaProps {
   onBack: () => void;
 }
 
-const avatarColors = [
-  ["#5865F2", "#EB459E"],
-  ["#3BA55D", "#43B581"],
-  ["#FAA61A", "#F04747"],
-  ["#9B59B6", "#3498DB"],
-  ["#ED4245", "#FEE75C"],
-];
+const DISCORD_COLORS = {
+  background: "#000000",
+  secondaryBg: "#111214",
+  pillInput: "#1E1F22",
+  text: "#F2F3F5",
+  textMuted: "#949BA4",
+  textDark: "#80848E",
+  blurple: "#5865F2",
+  green: "#23A559",
+  iconMuted: "#B5BAC1",
+  divider: "#1E1F22",
+  danger: "#F04747",
+};
 
 const getAvatarGradient = (id: number) =>
-  avatarColors[id % avatarColors.length];
+  ["#5865F2", "#EB459E", "#3BA55D", "#FAA61A", "#9B59B6"][id % 5];
 
 export const DirectMessageChatArea = ({
   conversationId,
@@ -43,9 +52,22 @@ export const DirectMessageChatArea = ({
   onBack,
 }: DirectMessageChatAreaProps) => {
   const user = useSelector((state: any) => state.auth.user);
+  const presenceMap = useSelector((state: any) => state.presence?.statusMap || {});
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ONLINE': return "#23A559";
+      case 'IDLE': return '#FAA61A';
+      case 'DND': return '#F04747';
+      default: return '#80848E';
+    }
+  };
+
   const [messages, setMessages] = useState<DirectMessageResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState("");
+  const textRef = useRef("");
+  const inputRef = useRef<TextInput>(null);
   const stompClient = useRef<Client | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -54,6 +76,7 @@ export const DirectMessageChatArea = ({
   useEffect(() => {
     loadHistory();
     connectWebSocket();
+    unhideConversation();
 
     return () => {
       if (stompClient.current) {
@@ -62,6 +85,21 @@ export const DirectMessageChatArea = ({
     };
   }, [conversationId]);
 
+  const unhideConversation = async () => {
+    try {
+      const hiddenStr = await AsyncStorage.getItem(`hidden_dms_${user?.id}`);
+      if (hiddenStr) {
+        let hiddenList: string[] = JSON.parse(hiddenStr);
+        if (hiddenList.includes(conversationId)) {
+          hiddenList = hiddenList.filter(id => id !== conversationId);
+          await AsyncStorage.setItem(`hidden_dms_${user?.id}`, JSON.stringify(hiddenList));
+        }
+      }
+    } catch (error) {
+      console.error("Error unhiding conversation:", error);
+    }
+  };
+
   const loadHistory = async () => {
     setLoading(true);
     setError(null);
@@ -69,13 +107,6 @@ export const DirectMessageChatArea = ({
       const data = await directMessageApi.getMessages(conversationId);
       // data.content contains the list if it's a Page object
       const msgList = data.content ? data.content : data;
-      // API returns sorting desc (newest first) for paging, but we might want to reverse for display if needed
-      // But usually FlatList with inverted={true} is better for chat.
-      // Only if the API returns desc, we should check order.
-      // Let's assume standard order for now (oldest top) or handle it.
-      // If the API returns newest first (desc), we should reverse it for standard view OR use inverted Flatlist.
-      // The plan said "sorted by createdAt desc" in controller.
-      // Let's reverse it to show oldest at top for standard chat view.
       setMessages([...msgList].reverse());
     } catch (error: any) {
       console.error("Error loading DM history:", error);
@@ -89,7 +120,7 @@ export const DirectMessageChatArea = ({
     const client = new Client({
       brokerURL: WS_URL,
       connectHeaders: {
-        login: user.userName, // Should likely use proper auth headers if supported
+        login: user.username, // Should likely use proper auth headers if supported
         passcode: "guest",
       },
       debug: (str) => {
@@ -119,12 +150,13 @@ export const DirectMessageChatArea = ({
   };
 
   const sendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!textRef.current.trim()) return;
 
-    // We use API to send message, backend handles WebSocket broadcast
     try {
-      await directMessageApi.sendMessage(friendId, inputText.trim());
+      await directMessageApi.sendMessage(friendId, textRef.current.trim());
+      textRef.current = "";
       setInputText("");
+      inputRef.current?.clear();
     } catch (err) {
       console.error("Failed to send message", err);
     }
@@ -132,23 +164,13 @@ export const DirectMessageChatArea = ({
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    const today = new Date();
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
 
-    const timeString = date.toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    if (date.toDateString() === today.toDateString()) {
-      return timeString;
-    } else {
-      const dateStr = date.toLocaleDateString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-      return `${dateStr} ${timeString}`;
-    }
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -165,14 +187,28 @@ export const DirectMessageChatArea = ({
   }) => {
     const isMe = item.senderId === user.id;
     const prevMessage = index > 0 ? messages[index - 1] : null;
+    const itemDate = new Date(item.createdAt);
+    const prevDate = prevMessage ? new Date(prevMessage.createdAt) : null;
+
     const showDateSeparator =
-      !prevMessage ||
-      new Date(item.createdAt).toDateString() !==
-        new Date(prevMessage.createdAt).toDateString();
+      !prevDate || itemDate.toDateString() !== prevDate.toDateString();
     const gradientColors = getAvatarGradient(item.senderId);
 
+    let isSequence = false;
+    if (
+      !showDateSeparator &&
+      prevMessage &&
+      prevMessage.senderId === item.senderId
+    ) {
+      const timeDiff = itemDate.getTime() - prevDate!.getTime();
+      if (timeDiff < 5 * 60 * 1000) {
+        // 5 minutes collapse
+        isSequence = true;
+      }
+    }
+
     return (
-      <View>
+      <View key={item.id}>
         {/* Date Separator */}
         {showDateSeparator && (
           <View style={styles.dateSeparator}>
@@ -183,44 +219,62 @@ export const DirectMessageChatArea = ({
         )}
 
         {/* Message */}
-        <TouchableOpacity activeOpacity={0.7} style={styles.messageContainer}>
-          {/* Avatar */}
-          <View style={styles.avatarContainer}>
-            {item.senderAvatar ? (
-              <Image
-                source={{ uri: item.senderAvatar }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.avatarPlaceholder,
-                  { backgroundColor: gradientColors[0] },
-                ]}
-              >
-                <Text style={styles.avatarText}>
-                  {item.senderName
-                    ? item.senderName.charAt(0).toUpperCase()
-                    : "U"}
-                </Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[
+            styles.messageContainer,
+            isSequence
+              ? styles.messageContainerSequence
+              : styles.messageContainerFirst,
+          ]}
+        >
+          {/* Avatar Column */}
+          <View style={styles.avatarColumn}>
+            {!isSequence ? (
+              <View style={styles.avatarContainer}>
+                {item.senderAvatar ? (
+                  <Image
+                    source={{ uri: item.senderAvatar }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.avatarPlaceholder,
+                      { backgroundColor: getAvatarGradient(item.senderId) },
+                    ]}
+                  >
+                    <Text style={styles.avatarText}>
+                      {(item.senderName || friendName).charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </View>
+            ) : (
+              <Text style={styles.sequenceTime}>
+                {new Date(item.createdAt).getHours()}:{String(new Date(item.createdAt).getMinutes()).padStart(2, '0')}
+              </Text>
             )}
           </View>
 
           {/* Content */}
           <View style={styles.messageContent}>
-            <View style={styles.messageHeader}>
-              <Text style={[styles.senderName, isMe && styles.senderNameMe]}>
-                {item.senderName || (isMe ? user.displayName : friendName)}
-              </Text>
-              <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
-            </View>
+            {!isSequence && (
+              <View style={styles.messageHeader}>
+                <Text style={[styles.senderName, isMe && styles.senderNameMe]}>
+                  {item.senderName || (isMe ? user.displayName : friendName)}
+                </Text>
+                <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
+              </View>
+            )}
             <Text style={styles.messageText}>{item.content}</Text>
           </View>
         </TouchableOpacity>
       </View>
     );
   };
+
+  const insets = useSafeAreaInsets();
 
   if (loading) {
     return (
@@ -232,141 +286,210 @@ export const DirectMessageChatArea = ({
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <IconButton
-              icon="arrow-left"
-              size={24}
-              iconColor="#FFFFFF"
-              style={{ margin: 0 }}
-            />
-          </TouchableOpacity>
-          <View style={styles.channelIcon}>
-            <IconButton
-              icon="at"
-              size={20}
-              iconColor="#949BA4"
-              style={{ margin: 0 }}
-            />
-          </View>
-          <View>
-            <Text style={styles.channelName}>{friendName}</Text>
-            <Text style={styles.channelDescription}>Tin nhắn riêng</Text>
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerIcon}>
-            <IconButton
-              icon="phone"
-              size={22}
-              iconColor="#B5BAC1"
-              style={{ margin: 0 }}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIcon}>
-            <IconButton
-              icon="video"
-              size={22}
-              iconColor="#B5BAC1"
-              style={{ margin: 0 }}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Messages */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({ animated: true })
-        }
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <IconButton icon="account" size={48} iconColor="#5865F2" />
-            </View>
-            <Text style={styles.emptyTitle}>{friendName}</Text>
-            <Text style={styles.emptyDescription}>
-              Đây là khởi đầu cuộc trò chuyện với {friendName}.
-            </Text>
-          </View>
-        }
-      />
-
-      {/* Input */}
+    <SafeAreaView
+      edges={["top", "bottom", "left", "right"]}
+      style={[styles.container, { paddingBottom: 0 }]}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#313338" />
       <KeyboardAvoidingView
+        style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <View style={styles.inputContainer}>
-          <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachButton}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
               <IconButton
-                icon="plus-circle"
+                icon="arrow-left"
+                size={24}
+                iconColor="#949BA4"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.headerAvatarContainer}>
+              <View style={[styles.headerAvatarPlaceholder, { backgroundColor: getAvatarGradient(friendId)[0] }]}>
+                <Text style={styles.headerAvatarText}>{friendName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={[styles.headerStatusIndicator, { backgroundColor: getStatusColor(presenceMap[friendId]) }]} />
+            </View>
+
+            <View style={styles.headerNameContainer}>
+              <Text numberOfLines={1} style={styles.headerNameText}>{friendName}</Text>
+              <IconButton
+                icon="chevron-right"
+                size={22}
+                iconColor="#949BA4"
+                style={{ margin: 0, marginLeft: -4 }}
+              />
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerIcon}>
+              <IconButton
+                icon="phone"
+                size={24}
+                iconColor="#FFFFFF"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIcon}>
+              <IconButton
+                icon="video"
+                size={24}
+                iconColor="#FFFFFF"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIcon}>
+              <IconButton
+                icon="magnify"
+                size={24}
+                iconColor="#FFFFFF"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <IconButton icon="account" size={48} iconColor="#5865F2" />
+              </View>
+              <Text style={styles.emptyTitle}>{friendName}</Text>
+              <Text style={styles.emptyDescription}>
+                Đây là khởi đầu cuộc trò chuyện với {friendName}.
+              </Text>
+            </View>
+          }
+        />
+
+        {/* Input */}
+        <View style={styles.inputContainer}>
+          {/* Attachment Button */}
+          <View style={styles.externalActionIcons}>
+            <TouchableOpacity style={styles.inputExternalIconPlus}>
+              <IconButton
+                icon="plus"
+                size={20}
+                iconColor="#B5BAC1"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.inputExternalIconSmall}>
+              <IconButton
+                icon="apps"
                 size={24}
                 iconColor="#B5BAC1"
                 style={{ margin: 0 }}
               />
             </TouchableOpacity>
 
+            <TouchableOpacity style={styles.inputExternalIconSmall}>
+              <IconButton
+                icon="gift"
+                size={24}
+                iconColor="#B5BAC1"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Input Field & Inline Buttons */}
+          <View style={styles.inputWrapper}>
             <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={`Nhắn tin cho @${friendName}`}
+              ref={inputRef}
+              defaultValue=""
+              onChangeText={(text) => {
+                textRef.current = text;
+                setInputText(text);
+              }}
+              placeholder={`Nhắn @${friendName}`}
               placeholderTextColor="#72767D"
               style={styles.textInput}
               multiline
-              maxLength={2000}
               onSubmitEditing={sendMessage}
             />
+            <TouchableOpacity style={styles.inputInsideIcon}>
+              <IconButton
+                icon="emoticon-happy"
+                size={24}
+                iconColor="#B5BAC1"
+                style={{ margin: 0 }}
+              />
+            </TouchableOpacity>
+          </View>
 
-            {inputText.trim() && (
-              <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
+          {/* Right Side Buttons: Send (if text exists) OR Microphone */}
+          <TouchableOpacity
+            onPress={inputText.trim() ? sendMessage : () => { }}
+            style={styles.inputExternalIconRight}
+          >
+            {inputText.trim() ? (
+              <View style={styles.sendIconActive}>
                 <IconButton
                   icon="send"
-                  size={22}
+                  size={18}
                   iconColor="#FFFFFF"
+                  style={{ margin: 0, marginLeft: 2 }}
+                />
+              </View>
+            ) : (
+              <View style={styles.micIconBg}>
+                <IconButton
+                  icon="microphone"
+                  size={20}
+                  iconColor="#B5BAC1"
                   style={{ margin: 0 }}
                 />
-              </TouchableOpacity>
+              </View>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView >
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#313338",
+    backgroundColor: DISCORD_COLORS.background,
+  },
+  keyboardContainer: {
+    flex: 1,
+    backgroundColor: DISCORD_COLORS.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#313338",
+    backgroundColor: DISCORD_COLORS.background,
     justifyContent: "center",
     alignItems: "center",
   },
   loadingText: {
     marginTop: 12,
-    color: "#B5BAC1",
+    color: DISCORD_COLORS.textMuted,
     fontSize: 14,
   },
   // Header
   header: {
     height: 52,
-    backgroundColor: "#313338",
+    backgroundColor: DISCORD_COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E1F22",
+    borderBottomColor: DISCORD_COLORS.divider,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -380,158 +503,247 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 4,
   },
-  channelIcon: {
-    marginRight: 4,
+  headerAvatarContainer: {
+    marginRight: 10,
+    position: 'relative',
   },
-  channelName: {
+  headerAvatarPlaceholder: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerAvatarText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
   },
-  channelDescription: {
-    color: "#B5BAC1",
-    fontSize: 11,
+  headerStatusIndicator: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    borderColor: DISCORD_COLORS.background,
+  },
+  headerNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerNameText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "bold",
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
   },
   headerIcon: {
-    marginLeft: 4,
+    marginLeft: 0,
   },
   // Messages List
   messagesList: {
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   dateSeparator: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginVertical: 16,
+    marginVertical: 12,
   },
   dateLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#3F4147",
+    backgroundColor: "#1E1F22",
   },
   dateText: {
-    color: "#949BA4",
+    color: DISCORD_COLORS.textDark,
     fontSize: 12,
-    fontWeight: "600",
-    paddingHorizontal: 8,
+    fontWeight: "bold",
+    paddingHorizontal: 12,
   },
   // Message
   messageContainer: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    paddingVertical: 2,
+    paddingVertical: 4,
+  },
+  messageContainerFirst: {
+    marginTop: 12,
+  },
+  messageContainerSequence: {
+    marginTop: 0,
+  },
+  avatarColumn: {
+    width: 42,
+    marginRight: 14,
+    alignItems: "center",
   },
   avatarContainer: {
-    width: 40,
-    marginRight: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: 'hidden',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  sequenceTime: {
+    color: DISCORD_COLORS.textDark,
+    fontSize: 10,
+    marginTop: 10,
+    opacity: 0.6,
   },
   messageContent: {
     flex: 1,
   },
   messageHeader: {
     flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 2,
+    alignItems: "center",
+    marginBottom: 4,
   },
   senderName: {
-    color: "#F2F3F5",
-    fontSize: 15,
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "bold",
     marginRight: 8,
   },
   senderNameMe: {
-    color: "#5865F2",
+    color: "#FFFFFF", // Standard Discord white for names
   },
   timestamp: {
-    color: "#949BA4",
+    color: DISCORD_COLORS.textDark,
     fontSize: 11,
+    fontWeight: '500',
   },
   messageText: {
     color: "#DCDDDE",
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 22,
   },
   // Empty
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-    marginTop: 40,
+    padding: 16,
+    marginTop: 20,
   },
   emptyIconContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#5865F2",
+    backgroundColor: DISCORD_COLORS.blurple,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyTitle: {
     color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 28,
+    fontWeight: "bold",
     marginBottom: 8,
   },
   emptyDescription: {
-    color: "#949BA4",
-    fontSize: 14,
-    textAlign: "center",
+    color: DISCORD_COLORS.textMuted,
+    fontSize: 15,
     lineHeight: 20,
   },
   // Input
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-  },
-  inputWrapper: {
-    backgroundColor: "#383A40",
-    borderRadius: 8,
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingVertical: 4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingBottom: 24,
+    paddingTop: 8,
+    backgroundColor: DISCORD_COLORS.background,
   },
-  attachButton: {
-    padding: 4,
+  externalActionIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    marginRight: 4,
+  },
+  inputExternalIconPlus: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#2B2D31",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 6,
+  },
+  inputExternalIconSmall: {
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: DISCORD_COLORS.pillInput,
+    borderRadius: 22,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 4,
+    minHeight: 40,
+    marginLeft: 4,
   },
   textInput: {
     flex: 1,
-    color: "#DCDDDE",
-    fontSize: 15,
+    color: "#FFFFFF",
+    fontSize: 16,
     paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 14,
     maxHeight: 120,
   },
-  sendButton: {
-    backgroundColor: "#5865F2",
-    borderRadius: 4,
-    marginLeft: 8,
-    padding: 4,
+  inputInsideIcon: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 36,
+    height: 36,
+    marginBottom: 2,
   },
+  inputExternalIconRight: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 6,
+  },
+  sendIconActive: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: DISCORD_COLORS.blurple,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  micIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#2B2D31",
+    justifyContent: "center",
+    alignItems: "center",
+  }
 });

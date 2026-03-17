@@ -6,6 +6,7 @@ export interface ChatMessage {
     senderId: number;
     senderName: string;
     senderAvatar?: string;
+    attachments?: string[];
     createdAt: string | number[]; // LocalDateTime string or array from backend
 }
 
@@ -24,5 +25,14 @@ export const chatApi = {
     },
     editMessage: async (messageId: string, content: string) => {
         return await apiClient.put<ChatMessage>(`/messages/${messageId}`, { content });
+    },
+    uploadFile: async (formData: FormData) => {
+        try {
+            const response = await apiClient.post<{ url: string }>("/upload", formData);
+            return response.url;
+        } catch (error) {
+            console.error("Error uploading file:", error);
+            throw error;
+        }
     }
 };

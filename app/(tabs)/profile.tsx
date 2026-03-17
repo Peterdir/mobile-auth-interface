@@ -1,4 +1,6 @@
 import { profileApi, UserProfile } from "@/src/api/profileApi";
+import { EditProfileModal } from "@/src/components/EditProfileModal";
+import { logout } from "@/src/store/slices/authSlice";
 import { storage } from "@/src/utils/storage";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -13,16 +15,12 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import {
   ActivityIndicator,
   IconButton,
-  Modal,
-  Provider as PaperProvider,
-  Portal,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -43,9 +41,25 @@ const DISCORD = {
   textMuted: "#B5BAC1",
   textDark: "#949BA4",
   divider: "#3F4147",
+  offline: "#80848E",
 };
 
+import { useDispatch, useSelector } from "react-redux";
+
 export default function ProfileScreen() {
+  const user = useSelector((state: any) => state.auth.user);
+  const presenceMap = useSelector((state: any) => state.presence?.statusMap || {});
+  const dispatch = useDispatch();
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ONLINE': return DISCORD.green;
+      case 'IDLE': return DISCORD.yellow;
+      case 'DND': return DISCORD.red;
+      default: return DISCORD.offline;
+    }
+  };
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -125,7 +139,11 @@ export default function ProfileScreen() {
         text: "Đăng xuất",
         style: "destructive",
         onPress: async () => {
+          // Clear all auth state before navigating to prevent
+          // background API calls from firing with an invalid token
+          dispatch(logout());
           await storage.removeToken();
+          await storage.removeUserInfo();
           router.replace("/(auth)/login");
         },
       },
@@ -197,7 +215,7 @@ export default function ProfileScreen() {
       edges={["top"]}
       style={{ flex: 1, backgroundColor: DISCORD.darkBg }}
     >
-      <PaperProvider>
+      <>
         <StatusBar barStyle="light-content" backgroundColor={DISCORD.darkBg} />
 
         {/* Custom Header */}
@@ -298,7 +316,7 @@ export default function ProfileScreen() {
                   )}
                   {/* Online Status */}
                   <View style={styles.statusBadge}>
-                    <View style={styles.statusBadgeInner} />
+                    <View style={[styles.statusBadgeInner, { backgroundColor: getStatusColor(presenceMap[profile?.id as number] || presenceMap[user?.id] || 'ONLINE') }]} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -334,10 +352,11 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.usernameRow}>
                 <Text style={styles.username}>
-                  {profile?.username || "peter_18352"}
+                  {profile?.username || user?.username || "user"}
                 </Text>
                 <IconButton
                   icon="star-four-points-circle-outline"
+
                   size={18}
                   iconColor={DISCORD.blurple}
                   style={{ margin: 0, marginLeft: 4 }}
@@ -522,38 +541,12 @@ export default function ProfileScreen() {
 
           <View style={{ height: 40 }} />
 
-          {/* Modals */}
-          <Portal>
-            <Modal
-              visible={visibleNameModal}
-              onDismiss={() => setVisibleNameModal(false)}
-              contentContainerStyle={styles.modalContainer}
-            >
-              <Text style={styles.modalTitle}>Đổi tên hiển thị</Text>
-              <Text style={styles.modalLabel}>TÊN HIỂN THỊ</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="Nhập tên của bạn"
-                placeholderTextColor={DISCORD.textDark}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => setVisibleNameModal(false)}
-                >
-                  <Text style={styles.modalCancelText}>Hủy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalSaveButton}
-                  onPress={updateName}
-                >
-                  <Text style={styles.modalSaveText}>Lưu</Text>
-                </TouchableOpacity>
-              </View>
-            </Modal>
-          </Portal>
+          <EditProfileModal
+            visible={visibleNameModal}
+            onClose={() => setVisibleNameModal(false)}
+            currentName={newName}
+            onSaveSuccess={fetchProfile}
+          />
         </ScrollView>
 
         {/* Nitro Store Modal */}
@@ -976,7 +969,7 @@ export default function ProfileScreen() {
             </ScrollView>
           </SafeAreaView>
         </RNModal>
-      </PaperProvider>
+      </>
     </SafeAreaView>
   );
 }
@@ -1360,61 +1353,6 @@ const styles = StyleSheet.create({
     color: DISCORD.textMuted,
     marginRight: 4,
   },
-  // Modal
-  modalContainer: {
-    backgroundColor: DISCORD.cardBg,
-    marginHorizontal: 20,
-    borderRadius: 8,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: DISCORD.text,
-    marginBottom: 20,
-  },
-  modalLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: DISCORD.textMuted,
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  modalInput: {
-    backgroundColor: DISCORD.inputBg,
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: DISCORD.text,
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  modalCancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 8,
-  },
-  modalCancelText: {
-    fontSize: 14,
-    color: DISCORD.textMuted,
-    fontWeight: "500",
-  },
-  modalSaveButton: {
-    backgroundColor: DISCORD.blurple,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 4,
-  },
-  modalSaveText: {
-    fontSize: 14,
-    color: DISCORD.white,
-    fontWeight: "600",
-  },
-
   // --- NITRO STORE MODAL STYLES ---
   storeContainer: {
     flex: 1,

@@ -7,6 +7,8 @@ import { InputModal } from "@/src/components/InputModal";
 import { InviteFriendsModal } from "@/src/components/InviteFriendsModal";
 import { JoinServerModal } from "@/src/components/JoinServerModal";
 import { ServerChannelList } from "@/src/components/ServerChannelList";
+import { ServerContextMenu } from "@/src/components/ServerContextMenu";
+import { ServerOptionsModal } from "@/src/components/ServerOptionsModal";
 import { VoiceChannelArea } from "@/src/components/VoiceChannelArea";
 import { VoiceChannelChat } from "@/src/components/VoiceChannelChat";
 import { VoiceChannelPreview } from "@/src/components/VoiceChannelPreview";
@@ -56,6 +58,12 @@ export default function HomeScreen() {
 
   // Voice Preview State
   const [showVoicePreview, setShowVoicePreview] = useState(false);
+
+  // Server Context Menu State
+  const [serverMenuVisible, setServerMenuVisible] = useState(false);
+  const [serverOptionsVisible, setServerOptionsVisible] = useState(false);
+  const [menuSelectedServer, setMenuSelectedServer] = useState<ServerUI | null>(null);
+
   const [previewChannelData, setPreviewChannelData] = useState<{
     id: number;
     name: string;
@@ -182,9 +190,10 @@ export default function HomeScreen() {
         text: "Đăng xuất",
         style: "destructive",
         onPress: async () => {
+          // Dispatch logout first to immediately stop background API calls
+          dispatch(logout());
           await storage.removeToken();
           await storage.removeUserInfo();
-          dispatch(logout());
           router.replace("/(auth)/login");
         },
       },
@@ -312,7 +321,10 @@ export default function HomeScreen() {
         <TouchableOpacity
           className={`w-12 h-12 rounded-[24px] items-center justify-center overflow-hidden transition-all ${isSelected ? "rounded-[16px] bg-discord-brand" : "bg-discord-element group-active:rounded-[16px] group-active:bg-discord-brand"}`}
           onPress={() => setSelectedServerId(server.id)}
-          onLongPress={() => handleDeleteServer(server)}
+          onLongPress={() => {
+            setMenuSelectedServer(server);
+            setServerMenuVisible(true);
+          }}
           delayLongPress={500}
           activeOpacity={0.8}
         >
@@ -413,8 +425,8 @@ export default function HomeScreen() {
     >
       <StatusBar style="light" backgroundColor="#1E1F22" />
 
-      {/* Sidebar (Servers) - Hidden when chat is fullscreen */}
-      {!isChatFullscreen && (
+      {/* Sidebar (Servers) - Hidden when chat is fullscreen or DM is open */}
+      {!isChatFullscreen && !selectedConversation && (
         <View className="w-[72px] bg-discord-element pt-3 items-center flex-col h-full flex">
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -526,6 +538,8 @@ export default function HomeScreen() {
                   isCameraOff={isCameraOff}
                   setIsCameraOff={setIsCameraOff}
                   voiceCallSeconds={voiceCallSeconds}
+                  username={user?.displayName || user?.username || user?.userName || 'User'}
+                  avatarUrl={user?.avatarUrl}
                   onBack={() => {
                     setIsChatFullscreen(false);
                     setActiveVoiceChannel(null);
@@ -576,6 +590,26 @@ export default function HomeScreen() {
         onDismiss={() => setJoinModalVisible(false)}
         onJoinSuccess={handleJoinSuccess}
       />
+
+      {menuSelectedServer && (
+        <ServerContextMenu
+          visible={serverMenuVisible}
+          onClose={() => setServerMenuVisible(false)}
+          serverName={menuSelectedServer.name}
+          onMoreOptions={() => {
+            setServerMenuVisible(false);
+            setServerOptionsVisible(true);
+          }}
+        />
+      )}
+
+      {menuSelectedServer && (
+        <ServerOptionsModal
+          visible={serverOptionsVisible}
+          onClose={() => setServerOptionsVisible(false)}
+          server={menuSelectedServer}
+        />
+      )}
 
       <VoiceChannelPreview
         visible={showVoicePreview}

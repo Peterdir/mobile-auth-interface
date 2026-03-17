@@ -1,8 +1,17 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router'; // Add useSegments
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { TextEncoder, TextDecoder } from 'text-encoding';
+
+// Polyfill for StompJS
+if (typeof global.TextEncoder === 'undefined') {
+  (global as any).TextEncoder = TextEncoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  (global as any).TextDecoder = TextDecoder;
+}
 import { MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import { Provider, useDispatch, useSelector } from 'react-redux'; // Add useSelector
 import '../src/global.css';

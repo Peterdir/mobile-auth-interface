@@ -7,19 +7,37 @@ export interface UserProfile {
     displayName: string;
     avatarUrl?: string; // Backend sends avatarUrl
     bio?: string;      // Backend sends bio
+    pronouns?: string; // Added pronouns field
     createdAt?: string;
     roles?: string[];
     // Fields missing in backend response but used in UI (mock or hide)
     phoneNumber?: string;
 }
 
+// Helper to normalize avatar URLs (Simplified, should match friendApi logic)
+const normalizeAvatarUrl = (url?: string) => {
+    if (!url) return url;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('file://')) {
+        return url;
+    }
+    return url; // For now, we'll let the component handle it or fix implementation in next step
+};
+
 export const profileApi = {
     // Lấy thông tin profile
-    getProfile: () => apiClient.get<UserProfile>('/users/me'),
+    getProfile: async () => {
+        const data = await apiClient.get<UserProfile>('/users/me');
+        return data;
+    },
 
-    // Cập nhật thông tin cơ bản (tên hiển thị, bio, etc.)
+    // Lấy thông tin profile theo ID
+    getUserById: async (userId: number) => {
+        const data = await apiClient.get<UserProfile>(`/users/${userId}`);
+        return data;
+    },
+
     // Backend endpoint: @PutMapping("/profile") -> /users/profile
-    updateProfile: (data: { displayName?: string; bio?: string; avatarUrl?: string }) =>
+    updateProfile: (data: { displayName?: string; bio?: string; avatarUrl?: string; pronouns?: string; country?: string }) =>
         apiClient.put<UserProfile>('/users/profile', data),
 
     // --- Features NOT implementation in Backend yet ---

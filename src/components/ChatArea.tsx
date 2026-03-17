@@ -2,6 +2,8 @@ import { chatApi, ChatMessage } from "@/src/api/chatApi";
 import { WS_URL } from "../api/config";
 
 import { Client } from "@stomp/stompjs";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -71,6 +73,8 @@ export const ChatArea = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState("");
+  const textRef = useRef("");
+  const inputRef = useRef<TextInput>(null);
   const [isTyping, setIsTyping] = useState(false);
   const stompClient = useRef<Client | null>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -86,13 +90,16 @@ export const ChatArea = ({
   const [error, setError] = useState<string | null>(null);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
   const [activeNitroCard, setActiveNitroCard] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Animations
   const expandAnim = useRef(new Animated.Value(0)).current;
   const sendAnim = useRef(new Animated.Value(0)).current;
 
   const hasText = inputText.trim().length > 0;
-  const isExpanded = isFocused || hasText;
+  const canSend = hasText || selectedFiles.length > 0;
+  const isExpanded = isFocused || canSend;
 
   useEffect(() => {
     Animated.timing(expandAnim, {
@@ -102,12 +109,12 @@ export const ChatArea = ({
     }).start();
 
     Animated.spring(sendAnim, {
-      toValue: hasText ? 1 : 0,
+      toValue: canSend ? 1 : 0,
       useNativeDriver: true,
       bounciness: 12,
       speed: 20,
     }).start();
-  }, [isExpanded, hasText]);
+  }, [isExpanded, canSend]);
 
   useEffect(() => {
     loadHistory();
@@ -201,29 +208,91 @@ export const ChatArea = ({
     stompClient.current = client;
   };
 
-  const sendMessage = () => {
-    if (!inputText.trim()) return;
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+
+    if (!result.canceled) {
+      setSelectedFiles((prev) => [...prev, ...result.assets]);
+    }
+  };
+
+  const pickDocument = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      multiple: true,
+    });
+
+    if (!result.canceled) {
+      setSelectedFiles((prev) => [...prev, ...result.assets]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const sendMessage = async () => {
+    if (!textRef.current.trim() && selectedFiles.length === 0) return;
 
     if (editMode && selectedMessage) {
-      handleEditMessage(selectedMessage.id, inputText.trim());
+      handleEditMessage(selectedMessage.id, textRef.current.trim());
       return;
     }
 
     if (!stompClient.current?.connected) return;
 
-    const messageContent = {
-      senderId: user.id,
-      content: inputText.trim(),
-    };
+    setIsUploading(true);
+    let attachments: string[] = [];
 
-    console.log("📤 Publishing message:", messageContent);
+    try {
+      // Upload all selected files
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const formData = new FormData();
 
-    stompClient.current.publish({
-      destination: `/app/chat/${channelId}`,
-      body: JSON.stringify(messageContent),
-    });
+          // ImagePicker and DocumentPicker have slightly different structures
+          const fileUri = file.uri;
+          const fileName = file.name || fileUri.split('/').pop();
+          const fileType = file.mimeType || "application/octet-stream";
 
-    setInputText("");
+          formData.append('file', {
+            uri: Platform.OS === 'android' ? fileUri : fileUri.replace('file://', ''),
+            name: fileName,
+            type: fileType,
+          } as any);
+
+          const uploadedUrl = await chatApi.uploadFile(formData);
+          attachments.push(uploadedUrl);
+        }
+      }
+
+      const messageContent = {
+        senderId: user.id,
+        content: textRef.current.trim(),
+        attachments: attachments,
+      };
+
+      console.log("📤 Publishing message with attachments:", messageContent);
+
+      stompClient.current.publish({
+        destination: `/app/chat/${channelId}`,
+        body: JSON.stringify(messageContent),
+      });
+
+      textRef.current = "";
+      setInputText("");
+      setSelectedFiles([]);
+      inputRef.current?.clear();
+    } catch (error) {
+      console.error("Failed to upload files or send message:", error);
+      Alert.alert("Lỗi", "Không thể tải tệp lên hoặc gửi tin nhắn.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleEditMessage = async (id: string, newContent: string) => {
@@ -231,7 +300,9 @@ export const ChatArea = ({
       await chatApi.editMessage(id, newContent);
       setEditMode(false);
       setSelectedMessage(null);
+      textRef.current = "";
       setInputText("");
+      inputRef.current?.clear();
     } catch (error) {
       console.error("Failed to edit message", error);
       Alert.alert("Lỗi", "Không thể sửa tin nhắn");
@@ -397,6 +468,34 @@ export const ChatArea = ({
                 <Text style={styles.editedText}> (đã chỉnh sửa)</Text>
               )}
             </Text>
+
+            {/* Attachments */}
+            {item.attachments && item.attachments.length > 0 && (
+              <View style={styles.attachmentsContainer}>
+                {item.attachments.map((url, idx) => {
+                  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                  return isImage ? (
+                    <Image
+                      key={idx}
+                      source={{ uri: url }}
+                      style={styles.attachmentImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.attachmentFile}
+                      activeOpacity={0.7}
+                    >
+                      <IconButton icon="file" size={24} iconColor="#B5BAC1" />
+                      <Text style={styles.attachmentFileName} numberOfLines={1}>
+                        {url.split('/').pop()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </TouchableOpacity>
       </View>
@@ -464,8 +563,7 @@ export const ChatArea = ({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      behavior="padding"
     >
       {/* Action Modal */}
       <Modal
@@ -485,7 +583,9 @@ export const ChatArea = ({
               style={styles.modalOption}
               onPress={() => {
                 setEditMode(true);
+                textRef.current = selectedMessage?.content || "";
                 setInputText(selectedMessage?.content || "");
+                inputRef.current?.setNativeProps({ text: selectedMessage?.content || "" });
                 setActionModalVisible(false);
               }}
             >
@@ -608,9 +708,47 @@ export const ChatArea = ({
       {/* {!error && ( */}
       {!error && (
         <View style={styles.inputContainer}>
+          {/* Selected Files Preview */}
+          {selectedFiles.length > 0 && (
+            <View style={styles.previewContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {selectedFiles.map((file, idx) => (
+                  <View key={idx} style={styles.previewItem}>
+                    {file.mimeType?.startsWith('image') || file.type?.startsWith('image') ? (
+                      <Image source={{ uri: file.uri }} style={styles.previewImage} />
+                    ) : (
+                      <View style={styles.previewFileIcon}>
+                        <IconButton icon="file" size={24} iconColor="#B5BAC1" />
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.removeFileBtn}
+                      onPress={() => removeFile(idx)}
+                    >
+                      <IconButton icon="close" size={12} iconColor="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Plus, Grid, Gift Icons on Left */}
-          {!inputText && (
-            <TouchableOpacity style={styles.inputExternalIcon}>
+          {!editMode && (
+            <TouchableOpacity
+              style={styles.inputExternalIcon}
+              onPress={() => {
+                Alert.alert(
+                  "Đính kèm",
+                  "Chọn loại tệp bạn muốn gửi",
+                  [
+                    { text: "Ảnh", onPress: pickImage },
+                    { text: "Tài liệu", onPress: pickDocument },
+                    { text: "Hủy", style: "cancel" }
+                  ]
+                );
+              }}
+            >
               <IconButton
                 icon="plus"
                 size={24}
@@ -618,6 +756,11 @@ export const ChatArea = ({
                 style={{ margin: 0 }}
               />
             </TouchableOpacity>
+          )}
+          {isUploading && (
+            <View style={styles.uploadingIndicator}>
+              <ActivityIndicator size="small" color="#5865F2" />
+            </View>
           )}
           <Animated.View
             style={{
@@ -658,13 +801,16 @@ export const ChatArea = ({
           {/* Pill Input */}
           <Animated.View style={[styles.inputWrapper, { flex: 1 }]}>
             <TextInput
-              value={inputText}
-              onChangeText={setInputText}
+              ref={inputRef}
+              defaultValue=""
+              onChangeText={(text) => {
+                textRef.current = text;
+                setInputText(text);
+              }}
               placeholder={editMode ? "Đang sửa..." : `Nhắn #${channelName}`}
               placeholderTextColor="#72767D"
               style={styles.textInput}
               multiline
-              maxLength={2000}
               onSubmitEditing={sendMessage}
               onFocus={() => {
                 setIsFocused(true);
@@ -692,7 +838,7 @@ export const ChatArea = ({
           {/* External Right Icon */}
           <TouchableOpacity
             style={styles.inputExternalIconRight}
-            onPress={hasText ? sendMessage : undefined}
+            onPress={canSend ? sendMessage : undefined}
             activeOpacity={0.8}
           >
             <Animated.View
@@ -751,7 +897,9 @@ export const ChatArea = ({
               style={styles.cancelEditBtn}
               onPress={() => {
                 setEditMode(false);
+                textRef.current = "";
                 setInputText("");
+                inputRef.current?.clear();
                 setSelectedMessage(null);
               }}
             >
@@ -1466,5 +1614,76 @@ const styles = StyleSheet.create({
   paginationDotActive: {
     backgroundColor: "#5865F2",
     width: 16,
+  },
+  attachmentsContainer: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  attachmentImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: "#2B2D31",
+  },
+  attachmentFile: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2B2D31",
+    padding: 8,
+    borderRadius: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    maxWidth: 250,
+  },
+  attachmentFileName: {
+    color: "#00A8FC",
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  previewContainer: {
+    position: "absolute",
+    top: -90,
+    left: 16,
+    right: 16,
+    height: 80,
+    backgroundColor: "#2B2D31",
+    borderRadius: 8,
+    padding: 8,
+    zIndex: 10,
+  },
+  previewItem: {
+    width: 64,
+    height: 64,
+    marginRight: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    backgroundColor: "#1E1F22",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewFileIcon: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeFileBtn: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ED4245",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  uploadingIndicator: {
+    padding: 8,
+    justifyContent: "center",
   },
 });

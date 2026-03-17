@@ -26,7 +26,7 @@ export interface CategoryResponse {
 export interface ServerMember {
     id: number;
     userId: number;
-    userName: string;
+    username: string;
     displayName: string;
     nickname?: string;
     role: 'OWNER' | 'ADMIN' | 'MEMBER';

@@ -21,6 +21,7 @@ const MAPPING = {
   'pencil': 'edit',
   'bell.fill': 'notifications',
   'smiley.fill': 'person',
+  'person.crop.circle.fill': 'emoji-emotions',
 } as IconMapping;
 
 /**

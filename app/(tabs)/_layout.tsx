@@ -4,10 +4,16 @@ import React from 'react';
 import { HapticTab } from '@/src/components/haptic-tab';
 import { IconSymbol } from '@/src/components/ui/icon-symbol';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
-import { Platform } from 'react-native';
+import { usePresenceSync } from '@/src/hooks/usePresenceSync';
+import { Platform, View } from 'react-native';
+import { useSelector } from 'react-redux';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const user = useSelector((state: any) => state.auth.user);
+
+  // Connect to presence websocket globally while user is in tabs
+  usePresenceSync();
 
   return (
     <Tabs
@@ -37,17 +43,36 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications" // Assuming you might have/want this, otherwise we can point to something else
+        name="notifications"
         options={{
           title: 'Các Thông Báo',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell.fill" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="profile" // Assuming a profile screen
+        name="profile"
         options={{
           title: 'Bạn',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="smiley.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <View style={{ position: 'relative' }}>
+              <IconSymbol size={28} name="person.crop.circle.fill" color={color} />
+              {user && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: -1,
+                    right: -1,
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    backgroundColor: '#23A559',
+                    borderWidth: 2,
+                    borderColor: '#1E1F22',
+                  }}
+                />
+              )}
+            </View>
+          ),
         }}
       />
     </Tabs>

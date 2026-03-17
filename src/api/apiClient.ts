@@ -14,6 +14,13 @@ export const apiClient = {
   ): Promise<T> => {
     const token = await storage.getToken();
 
+    // If no token and endpoint requires auth, skip the request to prevent
+    // 403 errors from background API calls after logout
+    const isAuthEndpoint = endpoint.includes("/auth/login") || endpoint.includes("/auth/register");
+    if (!token && !isAuthEndpoint) {
+      throw new Error("No auth token - user is logged out");
+    }
+
     const headers: Record<string, string> = {
       ...options.headers,
     };
@@ -41,16 +48,17 @@ export const apiClient = {
       clearTimeout(timeoutId);
 
       if (response.status === 401 || response.status === 403) {
-        // Clear session if unauthorized or forbidden (likely invalid token or expired session)
-        if (
+        // Clear session ONLY if 401 (Unauthorized - token invalid/expired)
+        // For 403 (Forbidden), just throw error without clearing session
+        if (response.status === 401 &&
           !endpoint.includes("/auth/login") &&
           !endpoint.includes("/auth/register")
         ) {
           await storage.clearAll();
           store.dispatch(logout());
-          console.warn("Session expired or forbidden. Clearing session.");
+          console.warn("Session expired. Clearing session.");
         }
-        throw new Error("Unauthorized/Forbidden - Session Cleared");
+        throw new Error(response.status === 401 ? "Unauthorized - Session Cleared" : "Forbidden - Access Denied");
       }
 
       if (!response.ok) {
@@ -75,16 +83,18 @@ export const apiClient = {
   get: <T>(endpoint: string) =>
     apiClient.request<T>(endpoint, { method: "GET" }),
 
-  post: <T>(endpoint: string, body: any) =>
+  post: <T>(endpoint: string, body: any, options: Partial<RequestOptions> = {}) =>
     apiClient.request<T>(endpoint, {
       method: "POST",
-      body: JSON.stringify(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
+      ...options,
     }),
 
-  put: <T>(endpoint: string, body: any) =>
+  put: <T>(endpoint: string, body: any, options: Partial<RequestOptions> = {}) =>
     apiClient.request<T>(endpoint, {
       method: "PUT",
-      body: JSON.stringify(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
+      ...options,
     }),
 
   delete: <T>(endpoint: string) =>

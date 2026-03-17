@@ -28,6 +28,7 @@ export const VoiceChannelArea: React.FC<VoiceChannelAreaProps> = ({
     onBack,
     onMinimize,
     username = 'Duy',
+    avatarUrl,
 }) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isInviteVisible, setIsInviteVisible] = useState(false);
@@ -70,10 +71,18 @@ export const VoiceChannelArea: React.FC<VoiceChannelAreaProps> = ({
                             style={{ position: 'absolute', width: '160%', height: '160%', zIndex: 10 }}
                             resizeMode="contain"
                         />
-                        <Image
-                            source={{ uri: 'https://cdn.discordapp.com/embed/avatars/0.png' }}
-                            style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#5865F2' }}
-                        />
+                        {avatarUrl ? (
+                            <Image
+                                source={{ uri: avatarUrl }}
+                                style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#5865F2' }}
+                            />
+                        ) : (
+                            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#5865F2', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ color: 'white', fontSize: 32, fontWeight: 'bold' }}>
+                                    {username.substring(0, 2).toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Bottom-Left Name Badge */}

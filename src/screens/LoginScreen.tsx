@@ -26,19 +26,19 @@ const DISCORD = {
 export default function LoginScreen() {
     const dispatch = useDispatch();
     const router = useRouter();
-    const [userName, setUserName] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
     const handleLogin = async () => {
-        if (!userName || !password) {
+        if (!username || !password) {
             Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
             return;
         }
         setLoading(true);
         try {
-            const result = await loginUser(userName, password);
+            const result = await loginUser(username, password);
 
             if (result.token) {
                 await storage.saveToken(result.token);
@@ -55,22 +55,24 @@ export default function LoginScreen() {
                         const userData = await userResponse.json();
                         const userInfo = {
                             id: userData.id,
-                            user: userName,
-                            username: userData.username,
+                            user: username,
+                            username: userData.username || username,
                             displayName: userData.displayName,
                             avatarUrl: userData.avatarUrl,
+                            bio: userData.bio,
+                            pronouns: userData.pronouns,
                             email: userData.email,
                             token: result.token
                         };
                         await storage.saveUserInfo(userInfo);
                         dispatch(login(userInfo));
                     } else {
-                        const userInfo = { id: result.userId, user: userName, token: result.token };
+                        const userInfo = { id: result.userId, user: username, username: username, token: result.token };
                         await storage.saveUserInfo(userInfo);
                         dispatch(login(userInfo));
                     }
                 } catch (e) {
-                    const userInfo = { id: result.userId, user: userName, token: result.token };
+                    const userInfo = { id: result.userId, user: username, username: username, token: result.token };
                     await storage.saveUserInfo(userInfo);
                     dispatch(login(userInfo));
                 }
@@ -119,8 +121,8 @@ export default function LoginScreen() {
                                 style={styles.input}
                                 placeholder=""
                                 placeholderTextColor={DISCORD.textDark}
-                                value={userName}
-                                onChangeText={setUserName}
+                                value={username}
+                                onChangeText={setUsername}
                                 autoCapitalize="none"
                                 autoCorrect={false}
                             />
